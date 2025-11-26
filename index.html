@@ -1,0 +1,635 @@
+import React, { useState, useEffect } from 'react';
+import { Wallet, Gift, History, Send, Lock, Unlock, Globe, RefreshCw, Copy, CheckCircle, XCircle } from 'lucide-react';
+
+// --- 配置常量 ---
+const MONAD_CHAIN_ID = 143;
+const MONAD_CHAIN_ID_HEX = '0x8f'; // 143 in hex
+const RPC_URL = 'https://rpc3.monad.xyz';
+
+// --- 模拟数据与工具 ---
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// 格式化地址显示
+const shortenAddress = (addr) => {
+  if (!addr) return '';
+  return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
+};
+
+export default function MonadRedPacket() {
+  // --- State 管理 ---
+  const [walletAddress, setWalletAddress] = useState('');
+  const [balance, setBalance] = useState('0.00'); // 模拟余额
+  const [activeTab, setActiveTab] = useState('home'); // home, send, history
+  const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState(null);
+  
+  // 红包数据存储 (模拟合约存储)
+  const [packets, setPackets] = useState([]);
+  const [userHistory, setUserHistory] = useState({ sent: [], received: [] });
+
+  // 发红包表单
+  const [formData, setFormData] = useState({
+    totalAmount: '',
+    count: '',
+    type: 'random', // random (拼手气), equal (普通均分)
+    accessType: 'public', // public (公共), password (口令)
+    password: ''
+  });
+
+  // 抢红包输入
+  const [claimPassword, setClaimPassword] = useState('');
+  const [selectedPacket, setSelectedPacket] = useState(null);
+
+  // --- Web3 连接逻辑 ---
+  const connectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      showNotification('error', '未检测到钱包，请安装 MetaMask');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const address = accounts[0];
+      setWalletAddress(address);
+
+      // 检查并切换网络
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+        });
+      } catch (switchError) {
+        // 如果网络不存在，则添加
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: MONAD_CHAIN_ID_HEX,
+                  chainName: 'Monad Testnet',
+                  rpcUrls: [RPC_URL],
+                  nativeCurrency: {
+                    name: 'MON',
+                    symbol: 'MON',
+                    decimals: 18,
+                  },
+                },
+              ],
+            });
+          } catch (addError) {
+            showNotification('error', '添加 Monad 网络失败');
+          }
+        }
+      }
+
+      // 模拟获取余额 (实际应调用 eth_getBalance)
+      setBalance((Math.random() * 100).toFixed(4)); 
+      showNotification('success', '钱包连接成功');
+
+    } catch (error) {
+      console.error(error);
+      showNotification('error', '连接被拒绝');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 核心业务逻辑 (模拟合约) ---
+
+  // 算法：生成随机红包金额
+  const generateRandomDistribution = (total, count) => {
+    let remain = parseFloat(total);
+    let amounts = [];
+    for (let i = 0; i < count - 1; i++) {
+      // 保证每个人至少有 0.01，且不抢走所有钱
+      const max = remain - (count - i - 1) * 0.01;
+      // 随机波动逻辑
+      let amount = (Math.random() * (max / 2)).toFixed(2); 
+      amount = Math.max(0.01, parseFloat(amount));
+      amounts.push(amount);
+      remain -= amount;
+    }
+    amounts.push(parseFloat(remain.toFixed(2))); // 最后一人拿剩下所有的
+    return amounts;
+  };
+
+  // 发红包
+  const handleCreatePacket = () => {
+    if (!walletAddress) return showNotification('error', '请先连接钱包');
+    if (!formData.totalAmount || !formData.count) return showNotification('error', '请填写完整信息');
+    if (parseFloat(formData.totalAmount) > parseFloat(balance)) return showNotification('error', '余额不足');
+
+    setLoading(true);
+
+    // 模拟网络延迟
+    setTimeout(() => {
+      const isRandom = formData.type === 'random';
+      const amount = parseFloat(formData.totalAmount);
+      const count = parseInt(formData.count);
+      
+      // 预先计算分配方案 (实际合约中通常是领取时计算，或者是Commit-Reveal，这里简化处理)
+      let distribution = [];
+      if (isRandom) {
+        distribution = generateRandomDistribution(amount, count);
+      } else {
+        const avg = (amount / count).toFixed(2);
+        distribution = Array(count).fill(parseFloat(avg));
+      }
+
+      const newPacket = {
+        id: generateId(),
+        sender: walletAddress,
+        totalAmount: amount,
+        remainingAmount: amount,
+        totalCount: count,
+        remainingCount: count,
+        type: formData.type,
+        accessType: formData.accessType,
+        password: formData.password, // 实际应存储 Hash
+        distribution: distribution, // 待领取的金额池
+        claims: [], // 已领取记录
+        timestamp: new Date().toISOString()
+      };
+
+      setPackets([newPacket, ...packets]);
+      
+      // 更新历史
+      setUserHistory(prev => ({
+        ...prev,
+        sent: [newPacket, ...prev.sent]
+      }));
+
+      // 扣除余额
+      setBalance((prev) => (parseFloat(prev) - amount).toFixed(4));
+      
+      setLoading(false);
+      showNotification('success', '红包发送成功！');
+      setFormData({ totalAmount: '', count: '', type: 'random', accessType: 'public', password: '' });
+      setActiveTab('home');
+    }, 1500);
+  };
+
+  // 抢红包
+  const handleClaimPacket = (packetId, passwordInput = '') => {
+    if (!walletAddress) return showNotification('error', '请先连接钱包');
+
+    const packetIndex = packets.findIndex(p => p.id === packetId);
+    if (packetIndex === -1) return showNotification('error', '红包不存在');
+    
+    const packet = packets[packetIndex];
+
+    // 检查是否已领过
+    if (packet.claims.some(c => c.claimer === walletAddress)) {
+      return showNotification('error', '你已经领取过该红包了');
+    }
+
+    if (packet.remainingCount <= 0) {
+      return showNotification('error', '手慢了，红包已抢完');
+    }
+
+    // 验证密码
+    if (packet.accessType === 'password' && packet.password !== passwordInput) {
+      return showNotification('error', '口令错误');
+    }
+
+    setLoading(true);
+    setTimeout(() => {
+      // 从预设池中取出一个金额
+      const claimAmount = packet.distribution[packet.remainingCount - 1]; // 简单取最后一个
+      
+      const newClaim = {
+        claimer: walletAddress,
+        amount: claimAmount,
+        timestamp: new Date().toISOString()
+      };
+
+      // 更新红包状态
+      const updatedPacket = {
+        ...packet,
+        remainingCount: packet.remainingCount - 1,
+        remainingAmount: packet.remainingAmount - claimAmount,
+        claims: [newClaim, ...packet.claims]
+      };
+
+      const newPackets = [...packets];
+      newPackets[packetIndex] = updatedPacket;
+      setPackets(newPackets);
+
+      // 更新余额
+      setBalance((prev) => (parseFloat(prev) + claimAmount).toFixed(4));
+
+      // 更新领取历史
+      setUserHistory(prev => ({
+        ...prev,
+        received: [{ packetId: packet.id, sender: packet.sender, amount: claimAmount, timestamp: new Date() }, ...prev.received]
+      }));
+
+      setLoading(false);
+      setSelectedPacket(null); // 关闭弹窗
+      setClaimPassword('');
+      showNotification('success', `成功抢到 ${claimAmount} MON`);
+    }, 1000);
+  };
+
+  // --- UI 组件 ---
+
+  const showNotification = (type, msg) => {
+    setNotification({ type, msg });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-20 md:pb-0">
+      
+      {/* 顶部导航 */}
+      <header className="bg-gradient-to-r from-red-600 to-red-500 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <Gift className="w-6 h-6 animate-bounce" />
+            <h1 className="text-xl font-bold tracking-wider">Monad 红包</h1>
+          </div>
+          
+          {walletAddress ? (
+            <div className="flex items-center space-x-3 bg-red-700 bg-opacity-40 px-3 py-1.5 rounded-full border border-red-400">
+              <span className="text-xs md:text-sm font-mono text-yellow-300 font-bold">{balance} MON</span>
+              <div className="h-4 w-[1px] bg-red-300"></div>
+              <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{shortenAddress(walletAddress)}</span>
+            </div>
+          ) : (
+            <button 
+              onClick={connectWallet}
+              className="flex items-center space-x-1 bg-white text-red-600 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm hover:bg-gray-100 transition"
+            >
+              <Wallet className="w-4 h-4" />
+              <span>连接钱包</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* 通知 Toast */}
+      {notification && (
+        <div className={`fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-xl flex items-center space-x-2 animate-fade-in-down ${
+          notification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {notification.type === 'success' ? <CheckCircle className="w-5 h-5"/> : <XCircle className="w-5 h-5"/>}
+          <span className="text-sm font-medium">{notification.msg}</span>
+        </div>
+      )}
+
+      {/* 主内容区 */}
+      <main className="max-w-3xl mx-auto p-4 space-y-6">
+        
+        {/* === 页面：红包大厅 (Receive) === */}
+        {activeTab === 'home' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-end">
+              <h2 className="text-2xl font-bold text-gray-800">红包大厅</h2>
+              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">ChainId: {MONAD_CHAIN_ID}</span>
+            </div>
+
+            {packets.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+                <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Gift className="w-10 h-10 text-red-300" />
+                </div>
+                <p className="text-gray-400">暂无红包，快去发一个吧！</p>
+                <button 
+                  onClick={() => setActiveTab('send')}
+                  className="mt-4 text-red-600 font-medium hover:underline"
+                >
+                  去发红包 &rarr;
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {packets.map((packet) => {
+                  const isClaimed = packet.claims.some(c => c.claimer === walletAddress);
+                  const isFinished = packet.remainingCount === 0;
+
+                  return (
+                    <div key={packet.id} className={`relative bg-white p-5 rounded-2xl shadow-sm border transition hover:shadow-md ${isFinished ? 'border-gray-200 opacity-60' : 'border-red-100'}`}>
+                      {/* 顶部标签 */}
+                      <div className="absolute top-0 right-0">
+                         {packet.type === 'random' ? (
+                           <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-bl-lg rounded-tr-lg font-medium">拼手气</span>
+                         ) : (
+                           <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-bl-lg rounded-tr-lg font-medium">普通</span>
+                         )}
+                      </div>
+
+                      <div className="flex items-start space-x-3">
+                        <div className={`p-3 rounded-full flex-shrink-0 ${isFinished ? 'bg-gray-100' : 'bg-red-50'}`}>
+                           {packet.accessType === 'password' ? <Lock className="w-6 h-6 text-red-500"/> : <Globe className="w-6 h-6 text-red-500"/>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500 truncate">发送者: {shortenAddress(packet.sender)}</p>
+                          <p className="text-lg font-bold text-gray-800 mt-1">
+                            {isFinished ? '已抢完' : packet.accessType === 'password' ? '口令红包' : '公共红包'}
+                          </p>
+                          <div className="mt-3 flex items-center justify-between text-sm">
+                            <span className="text-gray-500">剩余: <span className="text-red-600 font-bold">{packet.remainingCount}</span>/{packet.totalCount}</span>
+                            
+                            {isClaimed ? (
+                               <span className="text-green-600 font-medium bg-green-50 px-2 py-1 rounded text-xs">已领取</span>
+                            ) : isFinished ? (
+                               <span className="text-gray-400 text-xs">手慢了</span>
+                            ) : (
+                               <button 
+                                 onClick={() => {
+                                   if (packet.accessType === 'public') {
+                                     handleClaimPacket(packet.id);
+                                   } else {
+                                     setSelectedPacket(packet);
+                                   }
+                                 }}
+                                 disabled={loading}
+                                 className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-bold transition shadow-sm"
+                               >
+                                 {packet.accessType === 'password' ? '输入口令' : '立即开抢'}
+                               </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* === 页面：发红包 (Send) === */}
+        {activeTab === 'send' && (
+          <div className="bg-white rounded-2xl shadow-lg border border-red-100 overflow-hidden">
+             <div className="bg-red-50 p-6 border-b border-red-100">
+               <h2 className="text-xl font-bold text-red-900 flex items-center">
+                 <Send className="w-5 h-5 mr-2" /> 发送红包
+               </h2>
+               <p className="text-sm text-red-700 mt-1">将 MON 发送给朋友或群组</p>
+             </div>
+             
+             <div className="p-6 space-y-5">
+               {/* 模式选择 */}
+               <div className="grid grid-cols-2 gap-3">
+                 <button
+                   onClick={() => setFormData({...formData, type: 'random'})}
+                   className={`p-3 rounded-xl border flex flex-col items-center justify-center transition ${formData.type === 'random' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                 >
+                   <RefreshCw className="w-5 h-5 mb-1" />
+                   <span className="text-sm font-bold">拼手气</span>
+                 </button>
+                 <button
+                   onClick={() => setFormData({...formData, type: 'equal'})}
+                   className={`p-3 rounded-xl border flex flex-col items-center justify-center transition ${formData.type === 'equal' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                 >
+                   <CheckCircle className="w-5 h-5 mb-1" />
+                   <span className="text-sm font-bold">普通均分</span>
+                 </button>
+               </div>
+
+               {/* 金额输入 */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">总金额 (MON)</label>
+                 <div className="relative">
+                   <input 
+                     type="number" 
+                     placeholder="0.00"
+                     value={formData.totalAmount}
+                     onChange={(e) => setFormData({...formData, totalAmount: e.target.value})}
+                     className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:outline-none transition"
+                   />
+                   <span className="absolute right-4 top-3.5 text-gray-400 font-bold text-sm">MON</span>
+                 </div>
+               </div>
+
+               {/* 数量输入 */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">红包个数</label>
+                 <div className="relative">
+                    <input 
+                      type="number" 
+                      placeholder="填写个数"
+                      value={formData.count}
+                      onChange={(e) => setFormData({...formData, count: e.target.value})}
+                      className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:outline-none transition"
+                    />
+                    <span className="absolute right-4 top-3.5 text-gray-400 font-bold text-sm">个</span>
+                 </div>
+               </div>
+
+               {/* 访问控制 */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">领取方式</label>
+                 <div className="flex space-x-4">
+                   <label className="flex items-center cursor-pointer">
+                     <input 
+                       type="radio" 
+                       name="accessType"
+                       checked={formData.accessType === 'public'}
+                       onChange={() => setFormData({...formData, accessType: 'public'})}
+                       className="text-red-600 focus:ring-red-500"
+                     />
+                     <span className="ml-2 text-sm text-gray-700">公共可见</span>
+                   </label>
+                   <label className="flex items-center cursor-pointer">
+                     <input 
+                       type="radio" 
+                       name="accessType"
+                       checked={formData.accessType === 'password'}
+                       onChange={() => setFormData({...formData, accessType: 'password'})}
+                       className="text-red-600 focus:ring-red-500"
+                     />
+                     <span className="ml-2 text-sm text-gray-700">口令保护</span>
+                   </label>
+                 </div>
+               </div>
+
+               {/* 口令输入 */}
+               {formData.accessType === 'password' && (
+                 <div className="animate-fade-in">
+                   <label className="block text-sm font-medium text-gray-700 mb-1">设置口令</label>
+                   <div className="relative">
+                      <Lock className="absolute left-3 top-3.5 text-gray-400 w-4 h-4" />
+                      <input 
+                        type="text" 
+                        placeholder="领取的暗号"
+                        value={formData.password}
+                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                        className="w-full pl-10 pr-4 py-3 bg-red-50 border border-red-100 rounded-xl focus:ring-2 focus:ring-red-500 focus:outline-none transition"
+                      />
+                   </div>
+                 </div>
+               )}
+
+               <div className="pt-4">
+                 <button 
+                   onClick={handleCreatePacket}
+                   disabled={loading || !walletAddress}
+                   className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transform transition active:scale-95 ${loading || !walletAddress ? 'bg-gray-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 hover:shadow-red-200'}`}
+                 >
+                   {loading ? '处理中...' : (formData.totalAmount ? `塞进红包 ${formData.totalAmount} MON` : '准备发红包')}
+                 </button>
+               </div>
+             </div>
+          </div>
+        )}
+
+        {/* === 页面：历史记录 (History) === */}
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            
+            {/* 统计概览 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">我发出的</p>
+                <p className="text-2xl font-bold text-gray-800">{userHistory.sent.length} <span className="text-sm font-normal text-gray-400">个</span></p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">我抢到的</p>
+                <div className="flex items-baseline space-x-1">
+                  <p className="text-2xl font-bold text-red-600">
+                    {userHistory.received.reduce((acc, cur) => acc + parseFloat(cur.amount), 0).toFixed(2)}
+                  </p>
+                  <span className="text-xs font-medium text-gray-400">MON</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+               <div className="px-5 py-4 border-b border-gray-100">
+                 <h3 className="font-bold text-gray-800">领取记录明细</h3>
+               </div>
+               {userHistory.received.length === 0 ? (
+                 <div className="p-8 text-center text-gray-400 text-sm">暂无领取记录</div>
+               ) : (
+                 <ul>
+                   {userHistory.received.map((item, idx) => (
+                     <li key={idx} className="px-5 py-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-gray-50 transition">
+                       <div>
+                         <p className="text-sm font-bold text-gray-800">来自: {shortenAddress(item.sender)}</p>
+                         <p className="text-xs text-gray-400">{new Date(item.timestamp).toLocaleString()}</p>
+                       </div>
+                       <div className="text-right">
+                         <span className="block text-red-600 font-bold">+{item.amount} MON</span>
+                         <span className="text-xs text-green-600 bg-green-50 px-1 rounded">已入账</span>
+                       </div>
+                     </li>
+                   ))}
+                 </ul>
+               )}
+            </div>
+            
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+               <div className="px-5 py-4 border-b border-gray-100">
+                 <h3 className="font-bold text-gray-800">发送记录</h3>
+               </div>
+               {userHistory.sent.length === 0 ? (
+                 <div className="p-8 text-center text-gray-400 text-sm">暂无发送记录</div>
+               ) : (
+                 <ul>
+                   {userHistory.sent.map((item, idx) => (
+                     <li key={idx} className="px-5 py-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-gray-50 transition">
+                       <div>
+                         <p className="text-sm font-bold text-gray-800">
+                           {item.type === 'random' ? '拼手气' : '普通'}红包 
+                           {item.accessType === 'password' && <Lock className="inline w-3 h-3 ml-1 text-gray-400"/>}
+                         </p>
+                         <p className="text-xs text-gray-400">{new Date(item.timestamp).toLocaleString()}</p>
+                       </div>
+                       <div className="text-right">
+                         <span className="block text-gray-800 font-bold">-{item.totalAmount} MON</span>
+                         <span className="text-xs text-gray-500">已领 {item.totalCount - item.remainingCount}/{item.totalCount}</span>
+                       </div>
+                     </li>
+                   ))}
+                 </ul>
+               )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* 底部 Tab 导航 (Mobile Friendly) */}
+      <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 py-2 flex justify-around items-center md:hidden z-40 pb-safe">
+         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center space-y-1 ${activeTab === 'home' ? 'text-red-600' : 'text-gray-400'}`}>
+           <Gift className="w-6 h-6" />
+           <span className="text-xs scale-90">抢红包</span>
+         </button>
+         <button onClick={() => setActiveTab('send')} className={`flex flex-col items-center space-y-1 ${activeTab === 'send' ? 'text-red-600' : 'text-gray-400'}`}>
+           <div className={`p-2 rounded-full -mt-6 shadow-lg border-4 border-gray-50 ${activeTab === 'send' ? 'bg-red-600 text-white' : 'bg-white text-red-500'}`}>
+             <Send className="w-6 h-6 ml-0.5" />
+           </div>
+           <span className="text-xs scale-90">发红包</span>
+         </button>
+         <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center space-y-1 ${activeTab === 'history' ? 'text-red-600' : 'text-gray-400'}`}>
+           <History className="w-6 h-6" />
+           <span className="text-xs scale-90">记录</span>
+         </button>
+      </div>
+
+      {/* 桌面端 Tab 导航 (悬浮) */}
+      <div className="hidden md:flex fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-6 py-3 rounded-full shadow-xl border border-gray-200 z-40 space-x-8">
+        <button onClick={() => setActiveTab('home')} className={`flex items-center space-x-2 font-bold transition ${activeTab === 'home' ? 'text-red-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <Gift className="w-5 h-5" /> <span>抢红包</span>
+        </button>
+        <div className="w-[1px] bg-gray-200 h-6"></div>
+        <button onClick={() => setActiveTab('send')} className={`flex items-center space-x-2 font-bold transition ${activeTab === 'send' ? 'text-red-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <Send className="w-5 h-5" /> <span>发红包</span>
+        </button>
+        <div className="w-[1px] bg-gray-200 h-6"></div>
+        <button onClick={() => setActiveTab('history')} className={`flex items-center space-x-2 font-bold transition ${activeTab === 'history' ? 'text-red-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <History className="w-5 h-5" /> <span>记录</span>
+        </button>
+      </div>
+
+      {/* 口令输入弹窗 */}
+      {selectedPacket && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden relative animate-scale-up">
+            <button 
+              onClick={() => setSelectedPacket(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <XCircle className="w-6 h-6" />
+            </button>
+            <div className="bg-red-500 p-8 text-center text-white">
+              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                 <Lock className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold">这是一个口令红包</h3>
+              <p className="text-red-100 text-sm mt-1">输入正确的口令即可领取</p>
+            </div>
+            <div className="p-6">
+              <input 
+                 type="text" 
+                 placeholder="请输入口令"
+                 value={claimPassword}
+                 onChange={(e) => setClaimPassword(e.target.value)}
+                 className="w-full text-center text-lg border-b-2 border-gray-200 pb-2 mb-6 focus:border-red-500 focus:outline-none transition"
+              />
+              <button 
+                onClick={() => handleClaimPacket(selectedPacket.id, claimPassword)}
+                disabled={loading}
+                className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow-lg shadow-red-200"
+              >
+                {loading ? '开启中...' : '开红包'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scale-up { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
+        .animate-scale-up { animation: scale-up 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      `}</style>
+    </div>
+  );
+}
