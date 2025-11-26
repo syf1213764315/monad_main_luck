@@ -8,6 +8,7 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -17,6 +18,12 @@
         .animate-fade-in-down { animation: fade-in-down 0.3s ease-out; }
         .animate-scale-up { animation: scale-up 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        
+        /* 钱包选择模态框样式 */
+        .wallet-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -78,6 +85,11 @@
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         );
+        const ChevronRight = (props) => (
+            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+        );
 
         // --- 配置常量 ---
         const MONAD_CHAIN_ID = 143;
@@ -121,6 +133,8 @@
             const [provider, setProvider] = useState(null);
             const [signer, setSigner] = useState(null);
             const [contract, setContract] = useState(null);
+            const [connectedWalletType, setConnectedWalletType] = useState(''); // 'metamask', 'walletconnect', 'coinbase', etc.
+            const [showWalletModal, setShowWalletModal] = useState(false);
 
             const [formData, setFormData] = useState({
                 totalAmount: '',
@@ -134,54 +148,118 @@
             const [selectedPacket, setSelectedPacket] = useState(null);
 
             // --- Web3 连接逻辑 ---
-            const connectWallet = async () => {
-                if (typeof window.ethereum === 'undefined') {
-                    showNotification('error', '未检测到钱包，请安装 MetaMask');
+            
+            // 检测可用的钱包
+            const detectWallets = () => {
+                const wallets = [];
+                
+                // MetaMask
+                if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
+                    wallets.push({ id: 'metamask', name: 'MetaMask', icon: '🦊' });
+                }
+                
+                // Coinbase Wallet
+                if (typeof window.ethereum !== 'undefined' && window.ethereum.isCoinbaseWallet) {
+                    wallets.push({ id: 'coinbase', name: 'Coinbase Wallet', icon: '🔵' });
+                }
+                
+                // Trust Wallet
+                if (typeof window.ethereum !== 'undefined' && window.ethereum.isTrust) {
+                    wallets.push({ id: 'trust', name: 'Trust Wallet', icon: '⭐' });
+                }
+                
+                // Generic injected wallet (if ethereum exists but none of the above)
+                if (typeof window.ethereum !== 'undefined' && wallets.length === 0) {
+                    wallets.push({ id: 'injected', name: '钱包扩展', icon: '💼' });
+                }
+                
+                // WalletConnect (always available)
+                wallets.push({ id: 'walletconnect', name: 'WalletConnect', icon: '📱' });
+                
+                return wallets;
+            };
+
+            // 显示钱包选择模态框
+            const showWalletSelector = () => {
+                const availableWallets = detectWallets();
+                if (availableWallets.length === 0) {
+                    showNotification('error', '未检测到钱包，请安装 MetaMask 或其他 Web3 钱包');
                     return;
                 }
+                setShowWalletModal(true);
+            };
 
+            // 使用指定钱包连接
+            const connectWithWallet = async (walletType) => {
+                setShowWalletModal(false);
                 setLoading(true);
+                
                 try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    const address = accounts[0];
-                    setWalletAddress(address);
-
-                    // 检查并切换网络
-                    try {
-                        await window.ethereum.request({
-                            method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+                    let web3Provider;
+                    
+                    if (walletType === 'walletconnect') {
+                        // WalletConnect
+                        const WalletConnectProvider = window.WalletConnectProvider.default;
+                        const wcProvider = new WalletConnectProvider({
+                            rpc: {
+                                [MONAD_CHAIN_ID]: RPC_URL,
+                            },
+                            chainId: MONAD_CHAIN_ID,
                         });
-                    } catch (switchError) {
-                        if (switchError.code === 4902) {
-                            try {
-                                await window.ethereum.request({
-                                    method: 'wallet_addEthereumChain',
-                                    params: [{
-                                        chainId: MONAD_CHAIN_ID_HEX,
-                                        chainName: 'Monad Testnet',
-                                        rpcUrls: [RPC_URL],
-                                        nativeCurrency: {
-                                            name: 'MON',
-                                            symbol: 'MON',
-                                            decimals: 18,
-                                        },
-                                    }],
-                                });
-                            } catch (addError) {
-                                showNotification('error', '添加 Monad 网络失败');
-                                setLoading(false);
-                                return;
+                        
+                        await wcProvider.enable();
+                        web3Provider = new ethers.providers.Web3Provider(wcProvider);
+                    } else {
+                        // Injected wallets (MetaMask, Coinbase, Trust, etc.)
+                        if (typeof window.ethereum === 'undefined') {
+                            showNotification('error', '未检测到钱包扩展');
+                            setLoading(false);
+                            return;
+                        }
+                        
+                        await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+                    }
+                    
+                    // 获取地址
+                    const web3Signer = web3Provider.getSigner();
+                    const address = await web3Signer.getAddress();
+                    setWalletAddress(address);
+                    setSigner(web3Signer);
+                    setProvider(web3Provider);
+                    setConnectedWalletType(walletType);
+                    
+                    // 检查并切换网络 (仅对支持的钱包)
+                    if (walletType !== 'walletconnect') {
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_switchEthereumChain',
+                                params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+                            });
+                        } catch (switchError) {
+                            if (switchError.code === 4902) {
+                                try {
+                                    await window.ethereum.request({
+                                        method: 'wallet_addEthereumChain',
+                                        params: [{
+                                            chainId: MONAD_CHAIN_ID_HEX,
+                                            chainName: 'Monad Testnet',
+                                            rpcUrls: [RPC_URL],
+                                            nativeCurrency: {
+                                                name: 'MON',
+                                                symbol: 'MON',
+                                                decimals: 18,
+                                            },
+                                        }],
+                                    });
+                                } catch (addError) {
+                                    showNotification('error', '添加 Monad 网络失败');
+                                    setLoading(false);
+                                    return;
+                                }
                             }
                         }
                     }
-
-                    // 初始化 ethers
-                    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
-                    setProvider(web3Provider);
-                    
-                    const web3Signer = web3Provider.getSigner();
-                    setSigner(web3Signer);
 
                     // 初始化合约
                     const redPacketContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, web3Signer);
@@ -198,11 +276,29 @@
                     await loadUserHistory(redPacketContract, address);
 
                 } catch (error) {
-                    console.error(error);
-                    showNotification('error', '连接被拒绝');
+                    console.error('钱包连接错误:', error);
+                    showNotification('error', error.message || '连接被拒绝');
                 } finally {
                     setLoading(false);
                 }
+            };
+
+            // 断开钱包连接
+            const disconnectWallet = async () => {
+                if (connectedWalletType === 'walletconnect' && provider && provider.provider && provider.provider.disconnect) {
+                    await provider.provider.disconnect();
+                }
+                
+                setWalletAddress('');
+                setBalance('0.00');
+                setProvider(null);
+                setSigner(null);
+                setContract(null);
+                setConnectedWalletType('');
+                setPackets([]);
+                setUserHistory({ sent: [], received: [] });
+                
+                showNotification('success', '钱包已断开');
             };
 
             // 加载红包列表
@@ -396,22 +492,50 @@
 
             // 监听账户变化
             useEffect(() => {
-                if (window.ethereum) {
-                    window.ethereum.on('accountsChanged', (accounts) => {
+                if (window.ethereum && connectedWalletType !== 'walletconnect') {
+                    const handleAccountsChanged = (accounts) => {
                         if (accounts.length === 0) {
-                            setWalletAddress('');
-                            setBalance('0.00');
-                            setContract(null);
-                        } else {
-                            connectWallet();
+                            disconnectWallet();
+                        } else if (accounts[0].toLowerCase() !== walletAddress.toLowerCase()) {
+                            // 账户切换，重新连接
+                            if (connectedWalletType) {
+                                connectWithWallet(connectedWalletType);
+                            }
                         }
-                    });
+                    };
 
-                    window.ethereum.on('chainChanged', () => {
+                    const handleChainChanged = () => {
                         window.location.reload();
-                    });
+                    };
+
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                    window.ethereum.on('chainChanged', handleChainChanged);
+
+                    return () => {
+                        if (window.ethereum.removeListener) {
+                            window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+                            window.ethereum.removeListener('chainChanged', handleChainChanged);
+                        }
+                    };
                 }
-            }, []);
+            }, [connectedWalletType, walletAddress]);
+
+            // 监听 WalletConnect 断开连接
+            useEffect(() => {
+                if (connectedWalletType === 'walletconnect' && provider && provider.provider) {
+                    const handleDisconnect = () => {
+                        disconnectWallet();
+                    };
+
+                    provider.provider.on('disconnect', handleDisconnect);
+
+                    return () => {
+                        if (provider.provider.removeListener) {
+                            provider.provider.removeListener('disconnect', handleDisconnect);
+                        }
+                    };
+                }
+            }, [connectedWalletType, provider]);
 
             const showNotification = (type, msg) => {
                 setNotification({ type, msg });
@@ -430,16 +554,25 @@
                             </div>
                             
                             {walletAddress ? (
-                                <div className="flex items-center space-x-3 bg-red-700 bg-opacity-40 px-3 py-1.5 rounded-full border border-red-400">
-                                    <span className="text-xs md:text-sm font-mono text-yellow-300 font-bold">{parseFloat(balance).toFixed(4)} MON</span>
-                                    <div className="h-4 w-[1px] bg-red-300"></div>
-                                    <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{shortenAddress(walletAddress)}</span>
+                                <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 bg-red-700 bg-opacity-40 px-3 py-1.5 rounded-full border border-red-400">
+                                        <span className="text-xs md:text-sm font-mono text-yellow-300 font-bold">{parseFloat(balance).toFixed(4)} MON</span>
+                                        <div className="h-4 w-[1px] bg-red-300"></div>
+                                        <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{shortenAddress(walletAddress)}</span>
+                                    </div>
+                                    <button 
+                                        onClick={disconnectWallet}
+                                        className="bg-red-700 bg-opacity-40 px-2 py-1.5 rounded-full border border-red-400 hover:bg-red-800 transition"
+                                        title="断开钱包"
+                                    >
+                                        <XCircle className="w-4 h-4" />
+                                    </button>
                                 </div>
                             ) : (
                                 <button 
-                                    onClick={connectWallet}
+                                    onClick={showWalletSelector}
                                     disabled={loading}
-                                    className="flex items-center space-x-1 bg-white text-red-600 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm hover:bg-gray-100 transition"
+                                    className="flex items-center space-x-1 bg-white text-red-600 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm hover:bg-gray-100 transition disabled:opacity-50"
                                 >
                                     <Wallet />
                                     <span>连接钱包</span>
@@ -476,7 +609,7 @@
                                         </div>
                                         <p className="text-gray-600 mb-4">请先连接钱包</p>
                                         <button 
-                                            onClick={connectWallet}
+                                            onClick={showWalletSelector}
                                             className="bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700 transition"
                                         >
                                             连接钱包
@@ -816,6 +949,64 @@
                                     >
                                         {loading ? '开启中...' : '开红包'}
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 钱包选择弹窗 */}
+                    {showWalletModal && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative animate-scale-up">
+                                <button 
+                                    onClick={() => setShowWalletModal(false)}
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
+                                >
+                                    <XCircle className="w-6 h-6" />
+                                </button>
+                                
+                                <div className="bg-gradient-to-r from-red-600 to-red-500 p-8 text-center text-white">
+                                    <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                                        <Wallet />
+                                    </div>
+                                    <h3 className="text-2xl font-bold">选择钱包</h3>
+                                    <p className="text-red-100 text-sm mt-2">选择你想连接的钱包类型</p>
+                                </div>
+                                
+                                <div className="p-6 space-y-3">
+                                    {detectWallets().map((wallet) => (
+                                        <button
+                                            key={wallet.id}
+                                            onClick={() => connectWithWallet(wallet.id)}
+                                            disabled={loading}
+                                            className="wallet-option w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <span className="text-3xl">{wallet.icon}</span>
+                                                <div className="text-left">
+                                                    <p className="font-bold text-gray-800">{wallet.name}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {wallet.id === 'walletconnect' ? '扫码连接移动钱包' : '浏览器扩展'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="text-gray-400" />
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className="px-6 pb-6">
+                                    <p className="text-xs text-gray-500 text-center">
+                                        没有钱包？
+                                        <a 
+                                            href="https://metamask.io/download/" 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-red-600 hover:underline ml-1"
+                                        >
+                                            安装 MetaMask
+                                        </a>
+                                    </p>
                                 </div>
                             </div>
                         </div>

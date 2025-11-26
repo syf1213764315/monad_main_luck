@@ -4,7 +4,7 @@
 
 ## ✨ 功能特性
 
-- 🔗 **Web3 钱包连接** - 支持 MetaMask 等钱包
+- 🔗 **多钱包支持** - 支持 MetaMask、Coinbase Wallet、Trust Wallet、WalletConnect 等多种钱包
 - 🎲 **拼手气红包** - 随机金额分配，增加趣味性
 - ⚖️ **均分红包** - 公平分配，每人金额相等
 - 🔐 **口令红包** - 需要正确口令才能领取
@@ -55,9 +55,29 @@ npx serve .
 
 - **智能合约**: Solidity ^0.8.0
 - **前端框架**: React 18
-- **Web3 库**: ethers.js v5.7
+- **Web3 库**: ethers.js v5.7, WalletConnect v1.8
 - **样式框架**: Tailwind CSS
 - **区块链**: Monad (Chain ID: 143, RPC: https://rpc3.monad.xyz)
+
+## 💼 支持的钱包
+
+本 DApp 支持多种 Web3 钱包连接方式：
+
+### 浏览器扩展钱包
+- 🦊 **MetaMask** - 最流行的 Web3 钱包
+- 🔵 **Coinbase Wallet** - Coinbase 官方钱包
+- ⭐ **Trust Wallet** - 币安官方钱包
+- 💼 **其他兼容钱包** - 任何注入 `window.ethereum` 的钱包
+
+### 移动端钱包
+- 📱 **WalletConnect** - 支持 200+ 移动钱包
+  - Rainbow Wallet
+  - imToken
+  - TokenPocket
+  - Math Wallet
+  - 等等...
+
+> 详细说明请查看 [MULTI_WALLET.md](./MULTI_WALLET.md)
 
 ## 📖 使用说明
 
@@ -127,7 +147,21 @@ function getUserReceivedPackets(address user) external view returns (uint256[])
 ## 🐛 常见问题
 
 **Q: 钱包连接失败？**  
-A: 确保已安装 MetaMask 并授权网站访问。
+A: 
+- 确保已安装钱包扩展并授权网站访问
+- 尝试其他支持的钱包
+- 使用 WalletConnect 连接移动钱包
+
+**Q: 我可以使用哪些钱包？**  
+A: 支持 MetaMask、Coinbase Wallet、Trust Wallet、WalletConnect 等。点击"连接钱包"查看所有可用选项。
+
+**Q: 如何在移动端使用？**  
+A: 
+- 使用钱包 App 的内置浏览器打开 DApp
+- 或选择 WalletConnect 用手机钱包扫码连接
+
+**Q: 可以切换钱包吗？**  
+A: 可以。先点击断开按钮，然后重新选择其他钱包连接。
 
 **Q: 交易不确认？**  
 A: 测试网可能存在延迟，耐心等待或提高 Gas 价格。
@@ -136,7 +170,7 @@ A: 测试网可能存在延迟，耐心等待或提高 Gas 价格。
 A: 检查合约地址配置是否正确，确保钱包已连接。
 
 **Q: 无法切换网络？**  
-A: 手动在 MetaMask 中添加 Monad 网络。
+A: 手动在钱包中添加 Monad 网络，或使用支持自动添加网络的钱包。
 
 ## 🤝 贡献
 
