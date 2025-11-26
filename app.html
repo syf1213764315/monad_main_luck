@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monad 红包 - Web3 DApp</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fade-in-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scale-up { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
+        .animate-fade-in-down { animation: fade-in-down 0.3s ease-out; }
+        .animate-scale-up { animation: scale-up 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Lucide Icons (SVG Components)
+        const Wallet = () => (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+        );
+        const Gift = (props) => (
+            <svg className={props.className || "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+            </svg>
+        );
+        const History = (props) => (
+            <svg className={props.className || "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+        const Send = (props) => (
+            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+        );
+        const Lock = (props) => (
+            <svg className={props.className || "w-4 h-4"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+        );
+        const Globe = (props) => (
+            <svg className={props.className || "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+        const RefreshCw = (props) => (
+            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+        );
+        const CheckCircle = (props) => (
+            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+        const XCircle = (props) => (
+            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
+        // --- 配置常量 ---
+        const MONAD_CHAIN_ID = 143;
+        const MONAD_CHAIN_ID_HEX = '0x8f';
+        const RPC_URL = 'https://rpc3.monad.xyz';
+        
+        // TODO: 部署合约后，请在这里填写合约地址
+        const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // 请替换为实际部署的合约地址
+        
+        // 智能合约 ABI
+        const CONTRACT_ABI = [
+            "function createPacket(uint256 count, uint8 packetType, uint8 accessType, string memory password) external payable returns (uint256)",
+            "function claimPacket(uint256 packetId, string memory password) external",
+            "function getPacket(uint256 packetId) external view returns (address sender, uint256 totalAmount, uint256 remainingAmount, uint256 totalCount, uint256 remainingCount, uint8 packetType, uint8 accessType, uint256 timestamp, bool active)",
+            "function getPacketClaims(uint256 packetId) external view returns (tuple(address claimer, uint256 amount, uint256 timestamp)[])",
+            "function getUserSentPackets(address user) external view returns (uint256[])",
+            "function getUserReceivedPackets(address user) external view returns (uint256[])",
+            "function getRecentActivePackets(uint256 limit) external view returns (uint256[])",
+            "function nextPacketId() external view returns (uint256)",
+            "event PacketCreated(uint256 indexed packetId, address indexed sender, uint256 totalAmount, uint256 count, uint8 packetType, uint8 accessType)",
+            "event PacketClaimed(uint256 indexed packetId, address indexed claimer, uint256 amount)"
+        ];
+
+        // 工具函数
+        const shortenAddress = (addr) => {
+            if (!addr) return '';
+            return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
+        };
+
+        function MonadRedPacket() {
+            // --- State 管理 ---
+            const [walletAddress, setWalletAddress] = useState('');
+            const [balance, setBalance] = useState('0.00');
+            const [activeTab, setActiveTab] = useState('home');
+            const [loading, setLoading] = useState(false);
+            const [notification, setNotification] = useState(null);
+            
+            const [packets, setPackets] = useState([]);
+            const [userHistory, setUserHistory] = useState({ sent: [], received: [] });
+            
+            const [provider, setProvider] = useState(null);
+            const [signer, setSigner] = useState(null);
+            const [contract, setContract] = useState(null);
+
+            const [formData, setFormData] = useState({
+                totalAmount: '',
+                count: '',
+                type: 'random',
+                accessType: 'public',
+                password: ''
+            });
+
+            const [claimPassword, setClaimPassword] = useState('');
+            const [selectedPacket, setSelectedPacket] = useState(null);
+
+            // --- Web3 连接逻辑 ---
+            const connectWallet = async () => {
+                if (typeof window.ethereum === 'undefined') {
+                    showNotification('error', '未检测到钱包，请安装 MetaMask');
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    const address = accounts[0];
+                    setWalletAddress(address);
+
+                    // 检查并切换网络
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: MONAD_CHAIN_ID_HEX }],
+                        });
+                    } catch (switchError) {
+                        if (switchError.code === 4902) {
+                            try {
+                                await window.ethereum.request({
+                                    method: 'wallet_addEthereumChain',
+                                    params: [{
+                                        chainId: MONAD_CHAIN_ID_HEX,
+                                        chainName: 'Monad Testnet',
+                                        rpcUrls: [RPC_URL],
+                                        nativeCurrency: {
+                                            name: 'MON',
+                                            symbol: 'MON',
+                                            decimals: 18,
+                                        },
+                                    }],
+                                });
+                            } catch (addError) {
+                                showNotification('error', '添加 Monad 网络失败');
+                                setLoading(false);
+                                return;
+                            }
+                        }
+                    }
+
+                    // 初始化 ethers
+                    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+                    setProvider(web3Provider);
+                    
+                    const web3Signer = web3Provider.getSigner();
+                    setSigner(web3Signer);
+
+                    // 初始化合约
+                    const redPacketContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, web3Signer);
+                    setContract(redPacketContract);
+
+                    // 获取余额
+                    const bal = await web3Provider.getBalance(address);
+                    setBalance(ethers.utils.formatEther(bal));
+
+                    showNotification('success', '钱包连接成功');
+                    
+                    // 加载数据
+                    await loadPackets(redPacketContract);
+                    await loadUserHistory(redPacketContract, address);
+
+                } catch (error) {
+                    console.error(error);
+                    showNotification('error', '连接被拒绝');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // 加载红包列表
+            const loadPackets = async (contractInstance) => {
+                try {
+                    const packetIds = await contractInstance.getRecentActivePackets(50);
+                    const packetPromises = packetIds.map(async (id) => {
+                        const packet = await contractInstance.getPacket(id);
+                        return {
+                            id: id.toString(),
+                            sender: packet.sender,
+                            totalAmount: ethers.utils.formatEther(packet.totalAmount),
+                            remainingAmount: ethers.utils.formatEther(packet.remainingAmount),
+                            totalCount: packet.totalCount.toNumber(),
+                            remainingCount: packet.remainingCount.toNumber(),
+                            type: packet.packetType === 0 ? 'random' : 'equal',
+                            accessType: packet.accessType === 0 ? 'public' : 'password',
+                            timestamp: new Date(packet.timestamp.toNumber() * 1000).toISOString(),
+                            active: packet.active
+                        };
+                    });
+                    const loadedPackets = await Promise.all(packetPromises);
+                    setPackets(loadedPackets);
+                } catch (error) {
+                    console.error('加载红包失败:', error);
+                }
+            };
+
+            // 加载用户历史
+            const loadUserHistory = async (contractInstance, address) => {
+                try {
+                    // 加载发送的红包
+                    const sentIds = await contractInstance.getUserSentPackets(address);
+                    const sentPromises = sentIds.map(async (id) => {
+                        const packet = await contractInstance.getPacket(id);
+                        return {
+                            id: id.toString(),
+                            sender: packet.sender,
+                            totalAmount: ethers.utils.formatEther(packet.totalAmount),
+                            remainingAmount: ethers.utils.formatEther(packet.remainingAmount),
+                            totalCount: packet.totalCount.toNumber(),
+                            remainingCount: packet.remainingCount.toNumber(),
+                            type: packet.packetType === 0 ? 'random' : 'equal',
+                            accessType: packet.accessType === 0 ? 'public' : 'password',
+                            timestamp: new Date(packet.timestamp.toNumber() * 1000).toISOString()
+                        };
+                    });
+                    const sent = await Promise.all(sentPromises);
+
+                    // 加载领取的红包
+                    const receivedIds = await contractInstance.getUserReceivedPackets(address);
+                    const receivedPromises = receivedIds.map(async (id) => {
+                        const packet = await contractInstance.getPacket(id);
+                        const claims = await contractInstance.getPacketClaims(id);
+                        const userClaim = claims.find(c => c.claimer.toLowerCase() === address.toLowerCase());
+                        
+                        return {
+                            packetId: id.toString(),
+                            sender: packet.sender,
+                            amount: userClaim ? ethers.utils.formatEther(userClaim.amount) : '0',
+                            timestamp: userClaim ? new Date(userClaim.timestamp.toNumber() * 1000) : new Date()
+                        };
+                    });
+                    const received = await Promise.all(receivedPromises);
+
+                    setUserHistory({ sent, received });
+                } catch (error) {
+                    console.error('加载历史失败:', error);
+                }
+            };
+
+            // 创建红包
+            const handleCreatePacket = async () => {
+                if (!walletAddress) return showNotification('error', '请先连接钱包');
+                if (!contract) return showNotification('error', '合约未初始化');
+                if (!formData.totalAmount || !formData.count) return showNotification('error', '请填写完整信息');
+                
+                const amount = parseFloat(formData.totalAmount);
+                const count = parseInt(formData.count);
+                
+                if (amount <= 0) return showNotification('error', '金额必须大于0');
+                if (count <= 0 || count > 100) return showNotification('error', '红包数量必须在1-100之间');
+                if (amount > parseFloat(balance)) return showNotification('error', '余额不足');
+
+                setLoading(true);
+                try {
+                    const packetType = formData.type === 'random' ? 0 : 1;
+                    const accessType = formData.accessType === 'public' ? 0 : 1;
+                    const password = formData.password || '';
+                    
+                    const amountWei = ethers.utils.parseEther(amount.toString());
+                    
+                    const tx = await contract.createPacket(
+                        count,
+                        packetType,
+                        accessType,
+                        password,
+                        { value: amountWei }
+                    );
+                    
+                    showNotification('success', '交易已提交，等待确认...');
+                    await tx.wait();
+                    
+                    showNotification('success', '红包发送成功！');
+                    
+                    // 重新加载数据
+                    await loadPackets(contract);
+                    await loadUserHistory(contract, walletAddress);
+                    
+                    // 更新余额
+                    const bal = await provider.getBalance(walletAddress);
+                    setBalance(ethers.utils.formatEther(bal));
+                    
+                    // 重置表单
+                    setFormData({ 
+                        totalAmount: '', 
+                        count: '', 
+                        type: 'random', 
+                        accessType: 'public', 
+                        password: '' 
+                    });
+                    setActiveTab('home');
+                    
+                } catch (error) {
+                    console.error('创建红包失败:', error);
+                    showNotification('error', error.reason || error.message || '创建红包失败');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // 领取红包
+            const handleClaimPacket = async (packetId, passwordInput = '') => {
+                if (!walletAddress) return showNotification('error', '请先连接钱包');
+                if (!contract) return showNotification('error', '合约未初始化');
+
+                setLoading(true);
+                try {
+                    const tx = await contract.claimPacket(packetId, passwordInput);
+                    
+                    showNotification('success', '交易已提交，等待确认...');
+                    const receipt = await tx.wait();
+                    
+                    // 从事件中获取领取金额
+                    const claimEvent = receipt.events?.find(e => e.event === 'PacketClaimed');
+                    let claimAmount = '0';
+                    if (claimEvent) {
+                        claimAmount = ethers.utils.formatEther(claimEvent.args.amount);
+                    }
+                    
+                    showNotification('success', `成功抢到 ${claimAmount} MON`);
+                    
+                    // 重新加载数据
+                    await loadPackets(contract);
+                    await loadUserHistory(contract, walletAddress);
+                    
+                    // 更新余额
+                    const bal = await provider.getBalance(walletAddress);
+                    setBalance(ethers.utils.formatEther(bal));
+                    
+                    setSelectedPacket(null);
+                    setClaimPassword('');
+                    
+                } catch (error) {
+                    console.error('领取红包失败:', error);
+                    let errorMsg = '领取红包失败';
+                    if (error.reason) {
+                        errorMsg = error.reason;
+                    } else if (error.message) {
+                        if (error.message.includes('Already claimed')) errorMsg = '你已经领取过该红包了';
+                        else if (error.message.includes('Packet is empty')) errorMsg = '手慢了，红包已抢完';
+                        else if (error.message.includes('Wrong password')) errorMsg = '口令错误';
+                        else if (error.message.includes('Sender cannot claim')) errorMsg = '不能领取自己的红包';
+                    }
+                    showNotification('error', errorMsg);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // 自动刷新
+            useEffect(() => {
+                if (contract && walletAddress) {
+                    const interval = setInterval(async () => {
+                        await loadPackets(contract);
+                    }, 10000); // 每10秒刷新一次
+                    
+                    return () => clearInterval(interval);
+                }
+            }, [contract, walletAddress]);
+
+            // 监听账户变化
+            useEffect(() => {
+                if (window.ethereum) {
+                    window.ethereum.on('accountsChanged', (accounts) => {
+                        if (accounts.length === 0) {
+                            setWalletAddress('');
+                            setBalance('0.00');
+                            setContract(null);
+                        } else {
+                            connectWallet();
+                        }
+                    });
+
+                    window.ethereum.on('chainChanged', () => {
+                        window.location.reload();
+                    });
+                }
+            }, []);
+
+            const showNotification = (type, msg) => {
+                setNotification({ type, msg });
+                setTimeout(() => setNotification(null), 5000);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-20 md:pb-0">
+                    
+                    {/* 顶部导航 */}
+                    <header className="bg-gradient-to-r from-red-600 to-red-500 text-white p-4 shadow-lg sticky top-0 z-50">
+                        <div className="max-w-4xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                                <Gift className="w-6 h-6 animate-bounce" />
+                                <h1 className="text-xl font-bold tracking-wider">Monad 红包</h1>
+                            </div>
+                            
+                            {walletAddress ? (
+                                <div className="flex items-center space-x-3 bg-red-700 bg-opacity-40 px-3 py-1.5 rounded-full border border-red-400">
+                                    <span className="text-xs md:text-sm font-mono text-yellow-300 font-bold">{parseFloat(balance).toFixed(4)} MON</span>
+                                    <div className="h-4 w-[1px] bg-red-300"></div>
+                                    <span className="text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{shortenAddress(walletAddress)}</span>
+                                </div>
+                            ) : (
+                                <button 
+                                    onClick={connectWallet}
+                                    disabled={loading}
+                                    className="flex items-center space-x-1 bg-white text-red-600 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm hover:bg-gray-100 transition"
+                                >
+                                    <Wallet />
+                                    <span>连接钱包</span>
+                                </button>
+                            )}
+                        </div>
+                    </header>
+
+                    {/* 通知 Toast */}
+                    {notification && (
+                        <div className={`fixed top-20 right-4 left-4 md:left-auto md:w-96 z-50 px-4 py-3 rounded-lg shadow-xl flex items-center space-x-2 animate-fade-in-down ${
+                            notification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                            {notification.type === 'success' ? <CheckCircle /> : <XCircle />}
+                            <span className="text-sm font-medium flex-1">{notification.msg}</span>
+                        </div>
+                    )}
+
+                    {/* 主内容区 */}
+                    <main className="max-w-3xl mx-auto p-4 space-y-6">
+                        
+                        {/* 红包大厅 */}
+                        {activeTab === 'home' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-end">
+                                    <h2 className="text-2xl font-bold text-gray-800">红包大厅</h2>
+                                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">ChainId: {MONAD_CHAIN_ID}</span>
+                                </div>
+
+                                {!walletAddress ? (
+                                    <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+                                        <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Wallet />
+                                        </div>
+                                        <p className="text-gray-600 mb-4">请先连接钱包</p>
+                                        <button 
+                                            onClick={connectWallet}
+                                            className="bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700 transition"
+                                        >
+                                            连接钱包
+                                        </button>
+                                    </div>
+                                ) : packets.length === 0 ? (
+                                    <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+                                        <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Gift className="w-10 h-10 text-red-300" />
+                                        </div>
+                                        <p className="text-gray-400">暂无红包，快去发一个吧！</p>
+                                        <button 
+                                            onClick={() => setActiveTab('send')}
+                                            className="mt-4 text-red-600 font-medium hover:underline"
+                                        >
+                                            去发红包 &rarr;
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {packets.map((packet) => {
+                                            const isFinished = packet.remainingCount === 0;
+                                            const isSender = packet.sender.toLowerCase() === walletAddress.toLowerCase();
+
+                                            return (
+                                                <div key={packet.id} className={`relative bg-white p-5 rounded-2xl shadow-sm border transition hover:shadow-md ${isFinished ? 'border-gray-200 opacity-60' : 'border-red-100'}`}>
+                                                    <div className="absolute top-0 right-0">
+                                                        {packet.type === 'random' ? (
+                                                            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-bl-lg rounded-tr-lg font-medium">拼手气</span>
+                                                        ) : (
+                                                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-bl-lg rounded-tr-lg font-medium">普通</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-start space-x-3">
+                                                        <div className={`p-3 rounded-full flex-shrink-0 ${isFinished ? 'bg-gray-100' : 'bg-red-50'}`}>
+                                                            {packet.accessType === 'password' ? <Lock className="w-6 h-6 text-red-500"/> : <Globe className="w-6 h-6 text-red-500"/>}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs text-gray-500 truncate">发送者: {shortenAddress(packet.sender)}</p>
+                                                            <p className="text-lg font-bold text-gray-800 mt-1">
+                                                                {isFinished ? '已抢完' : packet.accessType === 'password' ? '口令红包' : '公共红包'}
+                                                            </p>
+                                                            <div className="mt-3 flex items-center justify-between text-sm">
+                                                                <span className="text-gray-500">剩余: <span className="text-red-600 font-bold">{packet.remainingCount}</span>/{packet.totalCount}</span>
+                                                                
+                                                                {isSender ? (
+                                                                    <span className="text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded text-xs">我发的</span>
+                                                                ) : isFinished ? (
+                                                                    <span className="text-gray-400 text-xs">手慢了</span>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            if (packet.accessType === 'public') {
+                                                                                handleClaimPacket(packet.id);
+                                                                            } else {
+                                                                                setSelectedPacket(packet);
+                                                                            }
+                                                                        }}
+                                                                        disabled={loading}
+                                                                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-bold transition shadow-sm disabled:bg-gray-400"
+                                                                    >
+                                                                        {packet.accessType === 'password' ? '输入口令' : '立即开抢'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 发红包 */}
+                        {activeTab === 'send' && (
+                            <div className="bg-white rounded-2xl shadow-lg border border-red-100 overflow-hidden">
+                                <div className="bg-red-50 p-6 border-b border-red-100">
+                                    <h2 className="text-xl font-bold text-red-900 flex items-center">
+                                        <Send className="mr-2" /> 发送红包
+                                    </h2>
+                                    <p className="text-sm text-red-700 mt-1">将 MON 发送给朋友或群组</p>
+                                </div>
+                                
+                                <div className="p-6 space-y-5">
+                                    {/* 模式选择 */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setFormData({...formData, type: 'random'})}
+                                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition ${formData.type === 'random' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            <RefreshCw className="mb-1" />
+                                            <span className="text-sm font-bold">拼手气</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setFormData({...formData, type: 'equal'})}
+                                            className={`p-3 rounded-xl border flex flex-col items-center justify-center transition ${formData.type === 'equal' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            <CheckCircle className="mb-1" />
+                                            <span className="text-sm font-bold">普通均分</span>
+                                        </button>
+                                    </div>
+
+                                    {/* 金额输入 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">总金额 (MON)</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="number" 
+                                                step="0.001"
+                                                placeholder="0.00"
+                                                value={formData.totalAmount}
+                                                onChange={(e) => setFormData({...formData, totalAmount: e.target.value})}
+                                                className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:outline-none transition"
+                                            />
+                                            <span className="absolute right-4 top-3.5 text-gray-400 font-bold text-sm">MON</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 数量输入 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">红包个数 (1-100)</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="number" 
+                                                placeholder="填写个数"
+                                                min="1"
+                                                max="100"
+                                                value={formData.count}
+                                                onChange={(e) => setFormData({...formData, count: e.target.value})}
+                                                className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:outline-none transition"
+                                            />
+                                            <span className="absolute right-4 top-3.5 text-gray-400 font-bold text-sm">个</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 访问控制 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">领取方式</label>
+                                        <div className="flex space-x-4">
+                                            <label className="flex items-center cursor-pointer">
+                                                <input 
+                                                    type="radio" 
+                                                    name="accessType"
+                                                    checked={formData.accessType === 'public'}
+                                                    onChange={() => setFormData({...formData, accessType: 'public'})}
+                                                    className="text-red-600 focus:ring-red-500"
+                                                />
+                                                <span className="ml-2 text-sm text-gray-700">公共可见</span>
+                                            </label>
+                                            <label className="flex items-center cursor-pointer">
+                                                <input 
+                                                    type="radio" 
+                                                    name="accessType"
+                                                    checked={formData.accessType === 'password'}
+                                                    onChange={() => setFormData({...formData, accessType: 'password'})}
+                                                    className="text-red-600 focus:ring-red-500"
+                                                />
+                                                <span className="ml-2 text-sm text-gray-700">口令保护</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* 口令输入 */}
+                                    {formData.accessType === 'password' && (
+                                        <div className="animate-fade-in">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">设置口令</label>
+                                            <div className="relative">
+                                                <Lock className="absolute left-3 top-3.5 text-gray-400 w-4 h-4" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="领取的暗号"
+                                                    value={formData.password}
+                                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                                    className="w-full pl-10 pr-4 py-3 bg-red-50 border border-red-100 rounded-xl focus:ring-2 focus:ring-red-500 focus:outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="pt-4">
+                                        <button 
+                                            onClick={handleCreatePacket}
+                                            disabled={loading || !walletAddress}
+                                            className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transform transition active:scale-95 ${loading || !walletAddress ? 'bg-gray-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 hover:shadow-red-200'}`}
+                                        >
+                                            {loading ? '处理中...' : (formData.totalAmount ? `塞进红包 ${formData.totalAmount} MON` : '准备发红包')}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 历史记录 */}
+                        {activeTab === 'history' && (
+                            <div className="space-y-6">
+                                {/* 统计概览 */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                                        <p className="text-xs text-gray-500 mb-1">我发出的</p>
+                                        <p className="text-2xl font-bold text-gray-800">{userHistory.sent.length} <span className="text-sm font-normal text-gray-400">个</span></p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                                        <p className="text-xs text-gray-500 mb-1">我抢到的</p>
+                                        <div className="flex items-baseline space-x-1">
+                                            <p className="text-2xl font-bold text-red-600">
+                                                {userHistory.received.reduce((acc, cur) => acc + parseFloat(cur.amount), 0).toFixed(4)}
+                                            </p>
+                                            <span className="text-xs font-medium text-gray-400">MON</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-gray-100">
+                                        <h3 className="font-bold text-gray-800">领取记录明细</h3>
+                                    </div>
+                                    {userHistory.received.length === 0 ? (
+                                        <div className="p-8 text-center text-gray-400 text-sm">暂无领取记录</div>
+                                    ) : (
+                                        <ul>
+                                            {userHistory.received.map((item, idx) => (
+                                                <li key={idx} className="px-5 py-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-gray-50 transition">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-gray-800">来自: {shortenAddress(item.sender)}</p>
+                                                        <p className="text-xs text-gray-400">{new Date(item.timestamp).toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="block text-red-600 font-bold">+{parseFloat(item.amount).toFixed(4)} MON</span>
+                                                        <span className="text-xs text-green-600 bg-green-50 px-1 rounded">已入账</span>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-gray-100">
+                                        <h3 className="font-bold text-gray-800">发送记录</h3>
+                                    </div>
+                                    {userHistory.sent.length === 0 ? (
+                                        <div className="p-8 text-center text-gray-400 text-sm">暂无发送记录</div>
+                                    ) : (
+                                        <ul>
+                                            {userHistory.sent.map((item, idx) => (
+                                                <li key={idx} className="px-5 py-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-gray-50 transition">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-gray-800">
+                                                            {item.type === 'random' ? '拼手气' : '普通'}红包 
+                                                            {item.accessType === 'password' && <Lock className="inline w-3 h-3 ml-1 text-gray-400"/>}
+                                                        </p>
+                                                        <p className="text-xs text-gray-400">{new Date(item.timestamp).toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="block text-gray-800 font-bold">-{item.totalAmount} MON</span>
+                                                        <span className="text-xs text-gray-500">已领 {item.totalCount - item.remainingCount}/{item.totalCount}</span>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* 底部导航 (Mobile) */}
+                    <div className="fixed bottom-0 w-full bg-white border-t border-gray-200 py-2 flex justify-around items-center md:hidden z-40 pb-safe">
+                        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center space-y-1 ${activeTab === 'home' ? 'text-red-600' : 'text-gray-400'}`}>
+                            <Gift className="w-6 h-6" />
+                            <span className="text-xs scale-90">抢红包</span>
+                        </button>
+                        <button onClick={() => setActiveTab('send')} className={`flex flex-col items-center space-y-1 ${activeTab === 'send' ? 'text-red-600' : 'text-gray-400'}`}>
+                            <div className={`p-2 rounded-full -mt-6 shadow-lg border-4 border-gray-50 ${activeTab === 'send' ? 'bg-red-600 text-white' : 'bg-white text-red-500'}`}>
+                                <Send className="w-6 h-6 ml-0.5" />
+                            </div>
+                            <span className="text-xs scale-90">发红包</span>
+                        </button>
+                        <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center space-y-1 ${activeTab === 'history' ? 'text-red-600' : 'text-gray-400'}`}>
+                            <History className="w-6 h-6" />
+                            <span className="text-xs scale-90">记录</span>
+                        </button>
+                    </div>
+
+                    {/* 桌面导航 */}
+                    <div className="hidden md:flex fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-6 py-3 rounded-full shadow-xl border border-gray-200 z-40 space-x-8">
+                        <button onClick={() => setActiveTab('home')} className={`flex items-center space-x-2 font-bold transition ${activeTab === 'home' ? 'text-red-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                            <Gift /> <span>抢红包</span>
+                        </button>
+                        <div className="w-[1px] bg-gray-200 h-6"></div>
+                        <button onClick={() => setActiveTab('send')} className={`flex items-center space-x-2 font-bold transition ${activeTab === 'send' ? 'text-red-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                            <Send /> <span>发红包</span>
+                        </button>
+                        <div className="w-[1px] bg-gray-200 h-6"></div>
+                        <button onClick={() => setActiveTab('history')} className={`flex items-center space-x-2 font-bold transition ${activeTab === 'history' ? 'text-red-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                            <History /> <span>记录</span>
+                        </button>
+                    </div>
+
+                    {/* 口令输入弹窗 */}
+                    {selectedPacket && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden relative animate-scale-up">
+                                <button 
+                                    onClick={() => setSelectedPacket(null)}
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                                >
+                                    <XCircle className="w-6 h-6" />
+                                </button>
+                                <div className="bg-red-500 p-8 text-center text-white">
+                                    <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                                        <Lock className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-xl font-bold">这是一个口令红包</h3>
+                                    <p className="text-red-100 text-sm mt-1">输入正确的口令即可领取</p>
+                                </div>
+                                <div className="p-6">
+                                    <input 
+                                        type="text" 
+                                        placeholder="请输入口令"
+                                        value={claimPassword}
+                                        onChange={(e) => setClaimPassword(e.target.value)}
+                                        className="w-full text-center text-lg border-b-2 border-gray-200 pb-2 mb-6 focus:border-red-500 focus:outline-none transition"
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleClaimPacket(selectedPacket.id, claimPassword);
+                                            }
+                                        }}
+                                    />
+                                    <button 
+                                        onClick={() => handleClaimPacket(selectedPacket.id, claimPassword)}
+                                        disabled={loading}
+                                        className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition shadow-lg shadow-red-200 disabled:bg-gray-400"
+                                    >
+                                        {loading ? '开启中...' : '开红包'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<MonadRedPacket />, document.getElementById('root'));
+    </script>
+</body>
+</html>
