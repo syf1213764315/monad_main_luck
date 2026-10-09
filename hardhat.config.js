@@ -16,9 +16,9 @@ module.exports = {
     }
   },
   networks: {
-    // Monad 测试网配置
+    // Monad Mainnet
     monad: {
-      url: "https://rpc3.monad.xyz",
+      url: "https://rpc.monad.xyz",
       chainId: 143,
       // 请使用环境变量或其他安全方式管理私钥
       // accounts: [process.env.PRIVATE_KEY]

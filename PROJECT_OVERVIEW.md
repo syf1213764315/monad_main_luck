@@ -20,8 +20,9 @@
 monad-red-packet/
 ├── 🎯 核心文件
 │   ├── RedPacket.sol              # Solidity 智能合约
-│   ├── app.html                   # 完整的前端应用（主文件）★
-│   └── index.html                 # 原始 UI 模板（仅供参考）
+│   ├── index.html                 # 完整的前端应用（Netlify 入口）★
+│   ├── app.html                   # 旧入口，跳转到 index.html
+│   └── netlify.toml               # Netlify 静态部署配置
 │
 ├── 📚 文档文件
 │   ├── README.md                  # 项目说明
@@ -52,7 +53,7 @@ monad-red-packet/
    - 实现了所有红包逻辑
    - 包含安全检查和事件
 
-2. **app.html** - 前端应用（主要使用文件）
+2. **index.html** - 前端应用（Netlify 入口，主要使用文件）
    - 包含完整的 React 应用
    - 集成 ethers.js 和 Web3 功能
    - 无需构建，直接在浏览器运行
@@ -77,7 +78,7 @@ monad-red-packet/
 
 2. **配置前端**（30 秒）
    ```
-   打开 app.html
+   打开 index.html
    → 搜索 CONTRACT_ADDRESS
    → 粘贴合约地址
    → 保存
@@ -85,8 +86,9 @@ monad-red-packet/
 
 3. **运行应用**（30 秒）
    ```bash
-   python3 -m http.server 8000
-   # 访问 localhost:8000/app.html
+   npx --yes serve .
+   # 访问 localhost:3000
+   # 或将仓库导入 Netlify 一键上线
    ```
 
 4. **开始使用**（1 分钟）
@@ -277,8 +279,8 @@ npm run serve
 # 3. 部署
 npm run deploy
 
-# 4. 更新 app.html 中的合约地址
-# 5. 部署前端到服务器
+# 4. 更新 index.html 中的合约地址
+# 5. 推送到 GitHub，由 Netlify 自动发布
 ```
 
 ---
@@ -307,10 +309,10 @@ npm run deploy
 
 ### 前端部署
 
-**免费选项**：
+**推荐**：Netlify（本仓库已包含 `netlify.toml`）
+
+**其他免费选项**：
 - GitHub Pages
-- Vercel
-- Netlify
 - Cloudflare Pages
 
 **付费选项**：
@@ -319,13 +321,9 @@ npm run deploy
 
 ### 合约部署
 
-**测试网**：
-- Monad Testnet (免费)
-- 需要测试 MON（从水龙头获取）
-
 **主网**：
-- Monad Mainnet
-- 需要真实 MON
+- Monad Mainnet（Chain ID 143）
+- 需要真实 MON 支付 Gas 和红包金额
 - **务必先审计合约！**
 
 ---

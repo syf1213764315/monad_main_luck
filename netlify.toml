@@ -1,0 +1,45 @@
+# Monad Red Packet DApp — Netlify static hosting
+# Connect this repo in the Netlify dashboard (or use Deploy to Netlify).
+# No build toolchain is required; the app runs from index.html.
+
+[build]
+  command = "echo 'Static DApp — skipping build'"
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[dev]
+  command = "npx --yes serve . -p 8888"
+  port = 8888
+  targetPort = 8888
+  autoLaunch = false
+
+# Keep old /app.html bookmarks working after the entry point moved to index.html
+[[redirects]]
+  from = "/app"
+  to = "/index.html"
+  status = 301
+
+[[redirects]]
+  from = "/app.html"
+  to = "/index.html"
+  status = 301
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
