@@ -13,10 +13,31 @@
 ## 文件说明
 
 - `RedPacket.sol` - 智能合约源代码
-- `app.html` - 完整的前端应用（包含所有功能）
-- `index.html` - 原始 UI 模板（仅供参考）
+- `index.html` - 完整的前端应用（Netlify 入口）
+- `app.html` - 兼容旧链接，自动跳转到 `index.html`
+- `netlify.toml` - Netlify 静态站点配置
 
 ## 部署步骤
+
+### 0. 部署前端到 Netlify（推荐）
+
+前端是纯静态站点，**不需要 npm build**。
+
+1. 把仓库推送到 GitHub
+2. 登录 [Netlify](https://app.netlify.com) → **Add new site** → **Import an existing project**
+3. 选择本仓库。`netlify.toml` 已配置：
+   - Publish directory: `.`
+   - Build command: 占位 echo（无真实构建）
+4. Deploy 完成后打开 Netlify URL
+5. 可选：在 Site settings → Domain management 绑定自定义域名
+
+本地预览：
+
+```bash
+npx --yes serve .
+```
+
+旧路径 `/app.html` 会 301 到 `index.html`。
 
 ### 1. 部署智能合约
 
@@ -30,11 +51,12 @@
 4. 部署合约：
    - 切换到 "Deploy & Run Transactions" 标签
    - Environment 选择 "Injected Provider - MetaMask"
-   - 确保 MetaMask 已连接到 Monad 网络：
-     - Network Name: `Monad Testnet`
-     - RPC URL: `https://rpc3.monad.xyz`
+   - 确保 MetaMask 已连接到 Monad 主网：
+     - Network Name: `Monad`
+     - RPC URL: `https://rpc.monad.xyz`
      - Chain ID: `143`
      - Currency Symbol: `MON`
+     - Block Explorer: `https://monadvision.com`
    - 点击 "Deploy"
    - 在 MetaMask 中确认交易
 5. 复制部署后的合约地址
@@ -60,7 +82,7 @@ module.exports = {
   solidity: "0.8.0",
   networks: {
     monad: {
-      url: "https://rpc3.monad.xyz",
+      url: "https://rpc.monad.xyz",
       chainId: 143,
       accounts: ["YOUR_PRIVATE_KEY"] // 注意：不要提交私钥到代码库
     }
@@ -78,36 +100,29 @@ npx hardhat run scripts/deploy.js --network monad
 
 ### 2. 配置前端
 
-1. 打开 `app.html` 文件
-2. 找到第 46 行的 `CONTRACT_ADDRESS` 常量
+1. 打开 `index.html` 文件
+2. 搜索 `CONTRACT_ADDRESS` 常量
 3. 将其替换为你部署的合约地址：
 
 ```javascript
 const CONTRACT_ADDRESS = '0xYourContractAddressHere';
 ```
 
-### 3. 运行应用
+### 3. 运行 / 发布前端
 
-#### 方法一：本地运行
+#### 方法一：Netlify（生产环境）
+
+见上文「部署前端到 Netlify」。推送 `index.html` 后站点会自动更新。
+
+#### 方法二：本地运行
 
 ```bash
-# 使用 Python 启动简单的 HTTP 服务器
+npx --yes serve .
+# 或
 python3 -m http.server 8000
-
-# 或使用 Node.js
-npx serve .
 ```
 
-然后在浏览器中打开 `http://localhost:8000/app.html`
-
-#### 方法二：部署到服务器
-
-将 `app.html` 上传到任何静态网站托管服务：
-- GitHub Pages
-- Vercel
-- Netlify
-- AWS S3
-- 任何 Web 服务器
+浏览器打开 `http://localhost:3000`（serve）或 `http://localhost:8000`。
 
 ### 4. 使用前准备
 
@@ -187,14 +202,15 @@ npx serve .
 ## 技术栈
 
 - **智能合约**: Solidity ^0.8.0
-- **前端**: React 18 (通过 CDN)
+- **前端**: React 18 (CDN，无构建)
 - **Web3 库**: ethers.js v5.7
-- **样式**: Tailwind CSS
-- **区块链**: Monad (Chain ID: 143)
+- **样式**: Tailwind CSS + Monad 品牌色
+- **托管**: Netlify
+- **区块链**: Monad Mainnet (Chain ID: 143, RPC: https://rpc.monad.xyz, Explorer: https://monadvision.com)
 
 ## 注意事项
 
-1. **合约地址配置**：部署合约后必须在 `app.html` 中更新 `CONTRACT_ADDRESS`
+1. **合约地址配置**：部署合约后必须在 `index.html` 中更新 `CONTRACT_ADDRESS`
 2. **网络配置**：确保 MetaMask 连接到正确的 Monad 网络
 3. **Gas 费用**：每次交易需要支付 Gas 费用（MON）
 4. **测试网**：如果是测试网，确保有足够的测试代币

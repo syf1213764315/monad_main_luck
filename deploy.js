@@ -26,8 +26,8 @@ async function main() {
   console.log("");
   console.log("📝 下一步操作:");
   console.log("1. 复制上面的合约地址");
-  console.log("2. 打开 app.html 文件");
-  console.log("3. 找到 CONTRACT_ADDRESS 常量（约第 46 行）");
+  console.log("2. 打开 index.html 文件");
+  console.log("3. 找到 CONTRACT_ADDRESS 常量");
   console.log("4. 将合约地址替换进去");
   console.log("");
   console.log("🔗 在区块浏览器上验证合约:");

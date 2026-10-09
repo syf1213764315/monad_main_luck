@@ -1,15 +1,16 @@
 {
   "name": "monad-red-packet",
   "version": "1.0.0",
-  "description": "A Web3 red packet DApp on Monad blockchain",
-  "main": "index.js",
+  "description": "A Web3 red packet DApp on Monad, hosted as a Netlify static site",
+  "main": "index.html",
   "scripts": {
     "compile": "hardhat compile",
     "deploy": "hardhat run deploy.js --network monad",
     "deploy:local": "hardhat run deploy.js --network localhost",
     "test": "hardhat test",
-    "serve": "npx serve .",
-    "start": "python3 -m http.server 8000"
+    "serve": "npx --yes serve .",
+    "start": "npx --yes serve .",
+    "dev": "npx --yes serve ."
   },
   "keywords": [
     "blockchain",

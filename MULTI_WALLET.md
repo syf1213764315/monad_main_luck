@@ -174,7 +174,7 @@ if (walletType === 'newwallet') {
 
 ### Q5: 支持哪些链？
 
-**A**: 目前只支持 Monad Testnet (Chain ID: 143)。连接时会自动切换网络。
+**A**: 目前支持 Monad Mainnet (Chain ID: 143)。连接时会自动切换网络。
 
 ### Q6: 移动端怎么使用？
 

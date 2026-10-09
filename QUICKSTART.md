@@ -12,12 +12,13 @@
    - 点击"添加网络"
    - 填写以下信息：
      ```
-     网络名称: Monad Testnet
-     RPC URL: https://rpc3.monad.xyz
+     网络名称: Monad
+     RPC URL: https://rpc.monad.xyz
      链 ID: 143
      货币符号: MON
+     区块浏览器: https://monadvision.com
      ```
-3. 获取一些测试 MON 代币（从水龙头或测试网）
+3. 准备一些 MON 用于 Gas 和红包金额
 
 ### 步骤 2: 部署合约
 
@@ -37,35 +38,29 @@
 
 ### 步骤 3: 配置前端
 
-1. 打开项目中的 `app.html` 文件
-2. 找到第 46 行（或搜索 `CONTRACT_ADDRESS`）：
+1. 打开项目中的 `index.html` 文件
+2. 搜索 `CONTRACT_ADDRESS`：
    ```javascript
    const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000';
    ```
-3. 将 `0x0000...` 替换为你刚才复制的合约地址
+3. 将地址替换为你刚才复制的合约地址
 4. 保存文件
 
-### 步骤 4: 运行应用
+### 步骤 4: 运行 / 发布应用
 
-**方法 A: 使用 Python（如果已安装）**
+**方法 A: 部署到 Netlify（推荐）**
+1. 推送到 GitHub
+2. 在 [Netlify](https://app.netlify.com) 导入仓库（`netlify.toml` 已配置 publish = `.`）
+3. 部署完成后打开站点 URL
+
+**方法 B: 本地预览**
 ```bash
-cd /path/to/project
-python3 -m http.server 8000
+npx --yes serve .
 ```
-
-**方法 B: 使用 Node.js（如果已安装）**
-```bash
-cd /path/to/project
-npx serve .
-```
-
-**方法 C: 直接打开**
-- 直接在浏览器中打开 `app.html` 文件
-- 注意：某些功能可能需要 HTTP 服务器才能正常工作
 
 ### 步骤 5: 开始使用
 
-1. 在浏览器中访问 `http://localhost:8000/app.html`
+1. 在浏览器中访问 Netlify URL 或 `http://localhost:3000`
 2. 点击"连接钱包"按钮
 3. 在 MetaMask 中授权连接
 4. 开始发送和领取红包！🎉
@@ -122,7 +117,7 @@ npm run deploy
 
 ### 步骤 5: 配置前端
 
-将合约地址更新到 `app.html` 的第 46 行（同方案一的步骤 3）
+将合约地址更新到 `index.html`（同方案一的步骤 3）
 
 ### 步骤 6: 运行应用
 
@@ -132,20 +127,19 @@ npm run serve
 npm start
 ```
 
-在浏览器中访问 `http://localhost:8000/app.html`
+在浏览器中访问 `http://localhost:3000`
 
 ---
 
-## 方案三：在线部署（无需本地环境）☁️
-
-### 使用 Vercel 或 Netlify
+## 方案三：Netlify 在线部署（无需本地环境）☁️
 
 1. 在 [Remix](https://remix.ethereum.org/) 中部署合约（参考方案一）
-2. 获取合约地址后，在 `app.html` 中更新
+2. 获取合约地址后，在 `index.html` 中更新 `CONTRACT_ADDRESS`
 3. 将整个项目上传到 GitHub
-4. 在 [Vercel](https://vercel.com/) 或 [Netlify](https://www.netlify.com/) 中导入项目
-5. 部署完成后，你会得到一个公开的 URL
-6. 分享给朋友，一起抢红包！
+4. 在 [Netlify](https://app.netlify.com) 中 Import 该仓库（使用仓库里的 `netlify.toml`）
+5. 部署完成后分享 Netlify URL，一起抢红包
+
+也可把项目文件夹拖到 [Netlify Drop](https://app.netlify.com/drop)。
 
 ---
 
@@ -195,7 +189,7 @@ npm run coverage
 **问题**: 连接钱包后看不到任何红包
 
 **解决方案**:
-1. 检查 `app.html` 中的合约地址是否正确配置
+1. 检查 `index.html` 中的合约地址是否正确配置
 2. 确保合约已成功部署
 3. 刷新页面
 4. 发送一个测试红包
@@ -231,7 +225,7 @@ npm run coverage
 - 研究 `RedPacket.sol` 学习智能合约开发
 
 🔨 **自定义开发**:
-- 修改 `app.html` 的 UI 样式
+- 修改 `index.html` 的 UI 样式
 - 在智能合约中添加新功能
 - 集成更多 Web3 功能
 

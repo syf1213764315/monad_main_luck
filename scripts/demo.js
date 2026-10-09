@@ -173,7 +173,7 @@ async function main() {
   console.log("\n" + "=".repeat(50));
   console.log("✅ 所有测试完成!");
   console.log("=".repeat(50));
-  console.log("\n💡 提示: 将合约地址 " + redPacket.address + " 更新到 app.html 中");
+  console.log("\n💡 提示: 将合约地址 " + redPacket.address + " 更新到 index.html 中");
 }
 
 main()
