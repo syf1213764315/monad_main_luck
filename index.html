@@ -44,6 +44,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+    <script src="https://unpkg.com/web3modal@1.9.12/dist/index.js"></script>
     <style>
         :root {
             --monad-purple: #6E54FF;
@@ -91,7 +92,42 @@
         .animate-float { animation: float 5.5s ease-in-out infinite; }
         .animate-pulse-glow { animation: pulse-glow 2.8s ease-in-out infinite; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-        .wallet-option:hover { transform: translateY(-2px); }
+        .web3modal-modal-lightbox {
+            z-index: 10000 !important;
+            background: rgba(5, 4, 10, 0.78) !important;
+            backdrop-filter: blur(10px);
+        }
+        .web3modal-modal-card {
+            background: #0E091C !important;
+            border: 1px solid rgba(110, 84, 255, 0.4) !important;
+            border-radius: 20px !important;
+            box-shadow: 0 18px 50px rgba(5, 4, 10, 0.55) !important;
+            max-width: 400px !important;
+        }
+        .web3modal-provider-wrapper {
+            border: none !important;
+            padding: 8px 14px !important;
+        }
+        .web3modal-provider-container {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(110, 84, 255, 0.22) !important;
+            border-radius: 16px !important;
+            padding: 14px 16px !important;
+            transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+        }
+        .web3modal-provider-container:hover {
+            background: rgba(110, 84, 255, 0.18) !important;
+            border-color: rgba(110, 84, 255, 0.55) !important;
+            transform: translateY(-1px);
+        }
+        .web3modal-provider-name {
+            color: #F7F5FF !important;
+            font-family: Outfit, Inter, sans-serif !important;
+            font-weight: 700 !important;
+        }
+        .web3modal-provider-description {
+            color: rgba(247, 245, 255, 0.5) !important;
+        }
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input, textarea { color-scheme: dark; }
@@ -109,66 +145,87 @@
 
         const { useState, useEffect } = React;
 
-        const Wallet = (props) => (
-            <svg className={props.className || "w-4 h-4"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-        );
-        const Gift = (props) => (
-            <svg className={props.className || "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-            </svg>
-        );
-        const History = (props) => (
-            <svg className={props.className || "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-        const Send = (props) => (
-            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-        );
-        const Lock = (props) => (
-            <svg className={props.className || "w-4 h-4"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-        );
-        const Globe = (props) => (
-            <svg className={props.className || "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-        const RefreshCw = (props) => (
-            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-        );
-        const CheckCircle = (props) => (
-            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-        const XCircle = (props) => (
-            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        );
-        const ChevronRight = (props) => (
-            <svg className={props.className || "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-        );
-        const ExternalLink = (props) => (
-            <svg className={props.className || "w-3.5 h-3.5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-        );
-        const MonadMark = (props) => (
-            <svg className={props.className || "w-7 h-7"} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-                <path fill="currentColor" fillRule="evenodd" d="M18.5 6h27C54.4 6 61 12.6 61 21.5v21c0 8.9-6.6 15.5-15.5 15.5h-27C9.6 58 3 51.4 3 42.5v-21C3 12.6 9.6 6 18.5 6zm2.2 14.8h22.6c4.7 0 8.5 3.8 8.5 8.5v15.4c0 4.7-3.8 8.5-8.5 8.5H20.7c-4.7 0-8.5-3.8-8.5-8.5V29.3c0-4.7 3.8-8.5 8.5-8.5z" />
-            </svg>
-        );
+        const twPx = (cls, fallback) => {
+            if (!cls) return fallback;
+            const m = String(cls).match(/\bw-(\d+(?:\.\d+)?)/);
+            if (!m) return fallback;
+            return parseFloat(m[1]) * 4;
+        };
+        const SvgIcon = ({ className, d, size }) => {
+            const px = size || twPx(className, 20);
+            return (
+                <svg
+                    className={className}
+                    width={px}
+                    height={px}
+                    style={{ width: px, height: px, minWidth: px, minHeight: px, flexShrink: 0, display: 'block' }}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
+                </svg>
+            );
+        };
+        const Wallet = (props) => <SvgIcon size={props.size || 16} className={props.className} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />;
+        const Gift = (props) => <SvgIcon size={props.size} className={props.className} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />;
+        const History = (props) => <SvgIcon size={props.size} className={props.className} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />;
+        const Send = (props) => <SvgIcon size={props.size} className={props.className} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />;
+        const Lock = (props) => <SvgIcon size={props.size} className={props.className} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />;
+        const Globe = (props) => <SvgIcon size={props.size} className={props.className} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />;
+        const RefreshCw = (props) => <SvgIcon size={props.size} className={props.className} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />;
+        const CheckCircle = (props) => <SvgIcon size={props.size} className={props.className} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />;
+        const XCircle = (props) => <SvgIcon size={props.size} className={props.className} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />;
+        const ExternalLink = (props) => <SvgIcon size={props.size || 14} className={props.className} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />;
+        const MonadMark = (props) => {
+            const px = props.size || twPx(props.className, 28);
+            return (
+                <svg
+                    className={props.className}
+                    width={px}
+                    height={px}
+                    style={{ width: px, height: px, minWidth: px, minHeight: px, flexShrink: 0, display: 'block' }}
+                    viewBox="0 0 64 64"
+                    fill="none"
+                    aria-hidden="true"
+                >
+                    <path fill="currentColor" fillRule="evenodd" d="M18.5 6h27C54.4 6 61 12.6 61 21.5v21c0 8.9-6.6 15.5-15.5 15.5h-27C9.6 58 3 51.4 3 42.5v-21C3 12.6 9.6 6 18.5 6zm2.2 14.8h22.6c4.7 0 8.5 3.8 8.5 8.5v15.4c0 4.7-3.8 8.5-8.5 8.5H20.7c-4.7 0-8.5-3.8-8.5-8.5V29.3c0-4.7 3.8-8.5 8.5-8.5z" />
+                </svg>
+            );
+        };
+
+        let web3ModalSingleton = null;
+        const getWeb3Modal = () => {
+            if (web3ModalSingleton) return web3ModalSingleton;
+            if (!window.Web3Modal) return null;
+            const Web3ModalLib = window.Web3Modal.default || window.Web3Modal;
+            const WalletConnectProvider = window.WalletConnectProvider
+                ? (window.WalletConnectProvider.default || window.WalletConnectProvider)
+                : null;
+            const providerOptions = {};
+            if (WalletConnectProvider) {
+                providerOptions.walletconnect = {
+                    package: WalletConnectProvider,
+                    options: {
+                        rpc: { [MONAD_CHAIN_ID]: RPC_URL },
+                        chainId: MONAD_CHAIN_ID
+                    }
+                };
+            }
+            web3ModalSingleton = new Web3ModalLib({
+                cacheProvider: true,
+                providerOptions,
+                theme: {
+                    background: 'rgb(14, 9, 28)',
+                    main: 'rgb(247, 245, 255)',
+                    secondary: 'rgb(133, 230, 255)',
+                    border: 'rgba(110, 84, 255, 0.45)',
+                    hover: 'rgb(26, 19, 48)'
+                }
+            });
+            return web3ModalSingleton;
+        };
 
         const MONAD_CHAIN_ID = 143;
         const MONAD_CHAIN_ID_HEX = '0x8f';
@@ -209,10 +266,10 @@
             const [userHistory, setUserHistory] = useState({ sent: [], received: [] });
 
             const [provider, setProvider] = useState(null);
+            const [rawProvider, setRawProvider] = useState(null);
             const [signer, setSigner] = useState(null);
             const [contract, setContract] = useState(null);
             const [connectedWalletType, setConnectedWalletType] = useState('');
-            const [showWalletModal, setShowWalletModal] = useState(false);
 
             const [formData, setFormData] = useState({
                 totalAmount: '',
@@ -225,35 +282,8 @@
             const [claimPassword, setClaimPassword] = useState('');
             const [selectedPacket, setSelectedPacket] = useState(null);
 
-            const detectWallets = () => {
-                const wallets = [];
-                if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
-                    wallets.push({ id: 'metamask', name: 'MetaMask', icon: '🦊', hint: 'Browser extension' });
-                }
-                if (typeof window.ethereum !== 'undefined' && window.ethereum.isCoinbaseWallet) {
-                    wallets.push({ id: 'coinbase', name: 'Coinbase Wallet', icon: '🔵', hint: 'Browser extension' });
-                }
-                if (typeof window.ethereum !== 'undefined' && window.ethereum.isTrust) {
-                    wallets.push({ id: 'trust', name: 'Trust Wallet', icon: '⭐', hint: 'Browser extension' });
-                }
-                if (typeof window.ethereum !== 'undefined' && wallets.length === 0) {
-                    wallets.push({ id: 'injected', name: 'Injected Wallet', icon: '💼', hint: 'Browser extension' });
-                }
-                wallets.push({ id: 'walletconnect', name: 'WalletConnect', icon: '📱', hint: 'Scan with a mobile wallet' });
-                return wallets;
-            };
-
-            const showWalletSelector = () => {
-                const availableWallets = detectWallets();
-                if (availableWallets.length === 0) {
-                    showNotification('error', '未检测到钱包，请安装 MetaMask 或其他 Web3 钱包');
-                    return;
-                }
-                setShowWalletModal(true);
-            };
-
-            const addMonadNetwork = async () => {
-                await window.ethereum.request({
+            const addMonadNetwork = async (requestProvider) => {
+                await requestProvider.request({
                     method: 'wallet_addEthereumChain',
                     params: [{
                         chainId: MONAD_CHAIN_ID_HEX,
@@ -269,50 +299,30 @@
                 });
             };
 
-            const connectWithWallet = async (walletType) => {
-                setShowWalletModal(false);
+            const connectWallet = async () => {
+                const modal = getWeb3Modal();
+                if (!modal) {
+                    showNotification('error', '钱包连接组件加载失败，请刷新页面');
+                    return;
+                }
+
                 setLoading(true);
-
                 try {
-                    let web3Provider;
+                    const instance = await modal.connect();
+                    const isWalletConnect = !!(instance && (instance.wc || instance.bridge));
+                    setRawProvider(instance);
+                    setConnectedWalletType(isWalletConnect ? 'walletconnect' : 'injected');
 
-                    if (walletType === 'walletconnect') {
-                        const WalletConnectProvider = window.WalletConnectProvider.default;
-                        const wcProvider = new WalletConnectProvider({
-                            rpc: {
-                                [MONAD_CHAIN_ID]: RPC_URL,
-                            },
-                            chainId: MONAD_CHAIN_ID,
-                        });
-                        await wcProvider.enable();
-                        web3Provider = new ethers.providers.Web3Provider(wcProvider);
-                    } else {
-                        if (typeof window.ethereum === 'undefined') {
-                            showNotification('error', '未检测到钱包扩展');
-                            setLoading(false);
-                            return;
-                        }
-                        await window.ethereum.request({ method: 'eth_requestAccounts' });
-                        web3Provider = new ethers.providers.Web3Provider(window.ethereum);
-                    }
-
-                    const web3Signer = web3Provider.getSigner();
-                    const address = await web3Signer.getAddress();
-                    setWalletAddress(address);
-                    setSigner(web3Signer);
-                    setProvider(web3Provider);
-                    setConnectedWalletType(walletType);
-
-                    if (walletType !== 'walletconnect') {
+                    if (instance && instance.request) {
                         try {
-                            await window.ethereum.request({
+                            await instance.request({
                                 method: 'wallet_switchEthereumChain',
                                 params: [{ chainId: MONAD_CHAIN_ID_HEX }],
                             });
                         } catch (switchError) {
-                            if (switchError.code === 4902) {
+                            if (switchError && switchError.code === 4902) {
                                 try {
-                                    await addMonadNetwork();
+                                    await addMonadNetwork(instance);
                                 } catch (addError) {
                                     showNotification('error', '添加 Monad 网络失败');
                                     setLoading(false);
@@ -321,6 +331,13 @@
                             }
                         }
                     }
+
+                    const web3Provider = new ethers.providers.Web3Provider(instance);
+                    const web3Signer = web3Provider.getSigner();
+                    const address = await web3Signer.getAddress();
+                    setWalletAddress(address);
+                    setSigner(web3Signer);
+                    setProvider(web3Provider);
 
                     const redPacketContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, web3Signer);
                     setContract(redPacketContract);
@@ -334,20 +351,31 @@
                     await loadUserHistory(redPacketContract, address);
                 } catch (error) {
                     console.error('钱包连接错误:', error);
-                    showNotification('error', error.message || '连接被拒绝');
+                    const msg = (error && error.message) ? error.message : String(error || '');
+                    if (!/user closed|modal closed|User rejected|closed by user/i.test(msg)) {
+                        showNotification('error', error.message || '连接被拒绝');
+                    }
                 } finally {
                     setLoading(false);
                 }
             };
 
             const disconnectWallet = async () => {
-                if (connectedWalletType === 'walletconnect' && provider && provider.provider && provider.provider.disconnect) {
-                    await provider.provider.disconnect();
+                try {
+                    const modal = getWeb3Modal();
+                    if (modal) modal.clearCachedProvider();
+                    if (rawProvider) {
+                        if (rawProvider.disconnect) await rawProvider.disconnect();
+                        else if (rawProvider.close) await rawProvider.close();
+                    }
+                } catch (e) {
+                    console.error(e);
                 }
 
                 setWalletAddress('');
                 setBalance('0.00');
                 setProvider(null);
+                setRawProvider(null);
                 setSigner(null);
                 setContract(null);
                 setConnectedWalletType('');
@@ -529,43 +557,38 @@
             }, [contract, walletAddress]);
 
             useEffect(() => {
-                if (window.ethereum && connectedWalletType !== 'walletconnect') {
-                    const handleAccountsChanged = (accounts) => {
-                        if (accounts.length === 0) {
-                            disconnectWallet();
-                        } else if (accounts[0].toLowerCase() !== walletAddress.toLowerCase()) {
-                            if (connectedWalletType) {
-                                connectWithWallet(connectedWalletType);
-                            }
-                        }
-                    };
-                    const handleChainChanged = () => {
-                        window.location.reload();
-                    };
-                    window.ethereum.on('accountsChanged', handleAccountsChanged);
-                    window.ethereum.on('chainChanged', handleChainChanged);
-                    return () => {
-                        if (window.ethereum.removeListener) {
-                            window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-                            window.ethereum.removeListener('chainChanged', handleChainChanged);
-                        }
-                    };
+                const modal = getWeb3Modal();
+                if (modal && modal.cachedProvider) {
+                    connectWallet();
                 }
-            }, [connectedWalletType, walletAddress]);
+            }, []);
 
             useEffect(() => {
-                if (connectedWalletType === 'walletconnect' && provider && provider.provider) {
-                    const handleDisconnect = () => {
+                if (!rawProvider || !rawProvider.on) return;
+                const handleAccountsChanged = (accounts) => {
+                    if (!accounts || accounts.length === 0) {
                         disconnectWallet();
-                    };
-                    provider.provider.on('disconnect', handleDisconnect);
-                    return () => {
-                        if (provider.provider.removeListener) {
-                            provider.provider.removeListener('disconnect', handleDisconnect);
-                        }
-                    };
-                }
-            }, [connectedWalletType, provider]);
+                    } else {
+                        connectWallet();
+                    }
+                };
+                const handleChainChanged = () => {
+                    window.location.reload();
+                };
+                const handleDisconnect = () => {
+                    disconnectWallet();
+                };
+                rawProvider.on('accountsChanged', handleAccountsChanged);
+                rawProvider.on('chainChanged', handleChainChanged);
+                rawProvider.on('disconnect', handleDisconnect);
+                return () => {
+                    if (rawProvider.removeListener) {
+                        rawProvider.removeListener('accountsChanged', handleAccountsChanged);
+                        rawProvider.removeListener('chainChanged', handleChainChanged);
+                        rawProvider.removeListener('disconnect', handleDisconnect);
+                    }
+                };
+            }, [rawProvider]);
 
             const showNotification = (type, msg) => {
                 setNotification({ type, msg });
@@ -616,7 +639,7 @@
                                 </div>
                             ) : (
                                 <button
-                                    onClick={showWalletSelector}
+                                    onClick={connectWallet}
                                     disabled={loading}
                                     className="flex items-center gap-2 bg-monad-purple hover:brightness-110 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-glow transition disabled:opacity-50"
                                 >
@@ -690,7 +713,7 @@
                                         <p className="text-white/80 font-medium">连接钱包，开始在 Monad 上抢红包</p>
                                         <p className="text-white/40 text-sm mt-1">MetaMask, Coinbase, Trust, WalletConnect</p>
                                         <button
-                                            onClick={showWalletSelector}
+                                            onClick={connectWallet}
                                             className="mt-5 bg-monad-purple hover:brightness-110 text-white px-6 py-2.5 rounded-full font-semibold shadow-glow transition"
                                         >
                                             连接钱包
@@ -779,8 +802,8 @@
                         {activeTab === 'send' && (
                             <div className="rounded-3xl glass shadow-card overflow-hidden">
                                 <div className="p-6 border-b border-white/10 bg-gradient-to-r from-monad-purple/20 to-transparent">
-                                    <h2 className="font-display text-xl font-bold flex items-center">
-                                        <Send className="mr-2 text-monad-cyan" /> 发送红包
+                                    <h2 className="font-display text-xl font-bold flex items-center gap-2">
+                                        <Send size={18} className="text-monad-cyan" /> 发送红包
                                     </h2>
                                     <p className="text-sm text-white/60 mt-1">Pack MON and send it across Monad</p>
                                 </div>
@@ -789,17 +812,17 @@
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => setFormData({...formData, type: 'random'})}
-                                            className={`p-4 rounded-2xl border flex flex-col items-center justify-center transition ${formData.type === 'random' ? 'border-monad-purple bg-monad-purple/15 text-white' : 'border-white/10 text-white/50 hover:bg-white/5'}`}
+                                            className={`p-3 rounded-2xl border flex flex-col items-center justify-center overflow-hidden transition ${formData.type === 'random' ? 'border-monad-purple bg-monad-purple/15 text-white' : 'border-white/10 text-white/50 hover:bg-white/5'}`}
                                         >
-                                            <RefreshCw className="mb-1" />
+                                            <RefreshCw size={18} className="mb-1" />
                                             <span className="text-sm font-bold">拼手气</span>
                                             <span className="text-[11px] text-white/40 mt-0.5">Lucky draw</span>
                                         </button>
                                         <button
                                             onClick={() => setFormData({...formData, type: 'equal'})}
-                                            className={`p-4 rounded-2xl border flex flex-col items-center justify-center transition ${formData.type === 'equal' ? 'border-monad-purple bg-monad-purple/15 text-white' : 'border-white/10 text-white/50 hover:bg-white/5'}`}
+                                            className={`p-3 rounded-2xl border flex flex-col items-center justify-center overflow-hidden transition ${formData.type === 'equal' ? 'border-monad-purple bg-monad-purple/15 text-white' : 'border-white/10 text-white/50 hover:bg-white/5'}`}
                                         >
-                                            <CheckCircle className="mb-1" />
+                                            <CheckCircle size={18} className="mb-1" />
                                             <span className="text-sm font-bold">普通均分</span>
                                             <span className="text-[11px] text-white/40 mt-0.5">Equal split</span>
                                         </button>
@@ -978,32 +1001,30 @@
 
                     <div className="fixed bottom-0 w-full glass border-t border-white/10 py-2 flex justify-around items-center md:hidden z-40 pb-safe">
                         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center space-y-1 ${activeTab === 'home' ? 'text-monad-cyan' : 'text-white/40'}`}>
-                            <Gift className="w-6 h-6" />
+                            <Gift size={20} />
                             <span className="text-xs scale-90">抢红包</span>
                         </button>
                         <button onClick={() => setActiveTab('send')} className={`flex flex-col items-center space-y-1 ${activeTab === 'send' ? 'text-monad-cyan' : 'text-white/40'}`}>
-                            <div className={`p-2 rounded-full -mt-6 shadow-glow border-4 border-[#05040A] ${activeTab === 'send' ? 'bg-monad-purple text-white' : 'bg-[#1A1330] text-monad-purple'}`}>
-                                <Send className="w-6 h-6 ml-0.5" />
-                            </div>
+                            <Send size={20} />
                             <span className="text-xs scale-90">发红包</span>
                         </button>
                         <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center space-y-1 ${activeTab === 'history' ? 'text-monad-cyan' : 'text-white/40'}`}>
-                            <History className="w-6 h-6" />
+                            <History size={20} />
                             <span className="text-xs scale-90">记录</span>
                         </button>
                     </div>
 
                     <div className="hidden md:flex fixed bottom-8 left-1/2 transform -translate-x-1/2 glass px-6 py-3 rounded-full shadow-card z-40 space-x-8">
                         <button onClick={() => setActiveTab('home')} className={`flex items-center space-x-2 font-semibold transition ${activeTab === 'home' ? 'text-monad-cyan' : 'text-white/40 hover:text-white'}`}>
-                            <Gift /> <span>抢红包</span>
+                            <Gift size={18} /> <span>抢红包</span>
                         </button>
                         <div className="w-px bg-white/15 h-6"></div>
                         <button onClick={() => setActiveTab('send')} className={`flex items-center space-x-2 font-semibold transition ${activeTab === 'send' ? 'text-monad-cyan' : 'text-white/40 hover:text-white'}`}>
-                            <Send /> <span>发红包</span>
+                            <Send size={18} /> <span>发红包</span>
                         </button>
                         <div className="w-px bg-white/15 h-6"></div>
                         <button onClick={() => setActiveTab('history')} className={`flex items-center space-x-2 font-semibold transition ${activeTab === 'history' ? 'text-monad-cyan' : 'text-white/40 hover:text-white'}`}>
-                            <History /> <span>记录</span>
+                            <History size={18} /> <span>记录</span>
                         </button>
                     </div>
 
@@ -1048,60 +1069,6 @@
                         </div>
                     )}
 
-                    {showWalletModal && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-                            <div className="w-full max-w-md rounded-3xl overflow-hidden relative animate-scale-up border border-monad-purple/40 shadow-glow bg-[#0E091C]">
-                                <button
-                                    onClick={() => setShowWalletModal(false)}
-                                    className="absolute top-4 right-4 text-white/50 hover:text-white z-10"
-                                >
-                                    <XCircle className="w-6 h-6" />
-                                </button>
-
-                                <div className="bg-gradient-to-r from-monad-purple to-[#3D2BB8] p-8 text-center">
-                                    <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                        <MonadMark className="w-9 h-9" />
-                                    </div>
-                                    <h3 className="font-display text-2xl font-bold">连接钱包</h3>
-                                    <p className="text-white/80 text-sm mt-2">Connect to Monad Mainnet</p>
-                                </div>
-
-                                <div className="p-6 space-y-3">
-                                    {detectWallets().map((wallet) => (
-                                        <button
-                                            key={wallet.id}
-                                            onClick={() => connectWithWallet(wallet.id)}
-                                            disabled={loading}
-                                            className="wallet-option w-full flex items-center justify-between p-4 bg-white/5 hover:bg-monad-purple/20 rounded-2xl border border-white/10 hover:border-monad-purple/40 transition disabled:opacity-50"
-                                        >
-                                            <div className="flex items-center space-x-3">
-                                                <span className="text-3xl">{wallet.icon}</span>
-                                                <div className="text-left">
-                                                    <p className="font-semibold">{wallet.name}</p>
-                                                    <p className="text-xs text-white/45">{wallet.hint}</p>
-                                                </div>
-                                            </div>
-                                            <ChevronRight className="text-white/30" />
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className="px-6 pb-6">
-                                    <p className="text-xs text-white/40 text-center">
-                                        没有钱包？
-                                        <a
-                                            href="https://metamask.io/download/"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-monad-cyan hover:underline ml-1"
-                                        >
-                                            安装 MetaMask
-                                        </a>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         }
